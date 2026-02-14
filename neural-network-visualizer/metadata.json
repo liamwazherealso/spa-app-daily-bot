@@ -1,0 +1,22 @@
+{
+  "title": "Neural Network Visualizer",
+  "description": "An interactive simulation that visualizes how artificial neural networks learn and adapt through animated connections and data flow",
+  "category": "animation",
+  "slug": "neural-network-visualizer",
+  "date": "2026-02-14",
+  "benchmark": {
+    "phase1_seconds": 171.2,
+    "phase2_seconds": 221.6,
+    "total_seconds": 392.8,
+    "output_bytes": 24570,
+    "temperature": 0.7,
+    "attempt": 1,
+    "model": "qwen3-coder:14b-16k",
+    "parameter_size": "30.5B",
+    "quantization": "Q4_K_M",
+    "family": "qwen3moe",
+    "os": "Linux",
+    "arch": "aarch64",
+    "vram_gb": 18.9
+  }
+}
