@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mood Garden</title>
+    <style>
+        :root {
+            --primary-color: #2E8B57;
+            --secondary-color: #FFD700;
+            --background-color: #F5F5F5;
+            --text-color: #333;
+            --border-radius: 12px;
+            --transition-speed: 0.3s;
+            --shadow: 0 4px 12px rgba(0,0,0,0.1);
+            --garden-bg: linear-gradient(to bottom, #e0f7fa, #bbdefb);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            padding-bottom: 2rem;
+        }
+
+        header {
+            background: linear-gradient(to right, var(--primary-color), #32CD32);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .app-title {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .app-subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .section {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow);
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .mood-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .mood-card {
+            background: #f0f8ff;
+            border: 2px solid #e0e0e0;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mood-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+        }
+
+        .mood-card.selected {
+            border-color: var(--primary-color);
+            background: #e8f5e9;
+            box-shadow: 0 0 15px rgba(46, 139, 87, 0.3);
+        }
+
+        .mood-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .mood-name {
+            font-weight: 600;
+        }
+
+        .garden-container {
+            height: 400px;
+            background: var(--garden-bg);
+            border-radius: var(--border-radius);
+            position: relative;
+            overflow: hidden;
+            margin: 1rem 0;
+            border: 2px solid #e0e0e0;
+        }
+
+        .plant {
+            position: absolute;
+            transition: all 0.5s ease;
+            transform-origin: bottom center;
+        }
+
+        .soil {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 30px;
+            background: linear-gradient(to top, #5D4037, #8D6E63);
+        }
+
+        .history-container {
+            height: 100px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+            padding: 1rem 0;
+            background: #f9f9f9;
+            border-radius: var(--border-radius);
+            margin: 1rem 0;
+        }
+
+        .history-bar {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            gap: 0.5rem;
+        }
+
+        .history-point {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .history-point:hover {
+            transform: scale(1.5);
+        }
+
+        .plant-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .info-card {
+            flex: 1;
+            min-width: 150px;
+            background: #f0f8ff;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .info-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .info-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        button {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            background: var(--primary-color);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            box-shadow: var(--shadow);
+        }
+
+        button:hover {
+            background: #228B22;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .reset-btn {
+            background: #ff6b6b;
+        }
+
+        .reset-btn:hover {
+            background: #ff5252;
+        }
+
+        footer {
+            text-align: center;
+            padding: 1rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .mood-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .garden-container {
+                height: 300px;
+            }
+            
+            .plant-info {
+                flex-direction: column;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .mood-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .app-title {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* Animations */
+        @keyframes bloom {
+            0% { transform: scale(0); opacity: 0; }
+            70% { transform: scale(1.1); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .bloom-animation {
+            animation: bloom 0.8s ease-out;
+        }
+
+        .fade-in {
+            animation: fade-in 0.5s ease-out;
+        }
+
+        .plant-bloom {
+            animation: bloom 1s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1 class="app-title">Mood Garden</h1>
+        <p class="app-subtitle">Grow your emotional garden</p>
+    </header>
+
+    <div class="container">
+        <section class="section">
+            <h2 class="section-title">How are you feeling today?</h2>
+            <div class="mood-grid" id="moodGrid">
+                <div class="mood-card" data-mood="happy">
+                    <div class="mood-icon">😊</div>
+                    <div class="mood-name">Happy</div>
+                </div>
+                <div class="mood-card" data-mood="sad">
+                    <div class="mood-icon">😢</div>
+                    <div class="mood-name">Sad</div>
+                </div>
+                <div class="mood-card" data-mood="excited">
+                    <div class="mood-icon">🤩</div>
+                    <div class="mood-name">Excited</div>
+                </div>
+                <div class="mood-card" data-mood="calm">
+                    <div class="mood-icon">😌</div>
+                    <div class="mood-name">Calm</div>
+                </div>
+                <div class="mood-card" data-mood="anxious">
+                    <div class="mood-icon">😰</div>
+                    <div class="mood-name">Anxious</div>
+                </div>
+                <div class="mood-card" data-mood="angry">
+                    <div class="mood-icon">😠</div>
+                    <div class="mood-name">Angry</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">Your Garden</h2>
+            <div class="garden-container" id="garden">
+                <div class="soil"></div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">Emotional History</h2>
+            <div class="history-container">
+                <div class="history-bar" id="historyBar"></div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">Plant Details</h2>
+            <div class="plant-info">
+                <div class="info-card">
+                    <div class="info-value" id="plantCount">0</div>
+                    <div class="info-label">Plants</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-value" id="avgMood">0</div>
+                    <div class="info-label">Avg Mood</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-value" id="growthStage">Seedling</div>
+                    <div class="info-label">Growth Stage</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-value" id="currentMood">None</div>
+                    <div class="info-label">Current Mood</div>
+                </div>
+            </div>
+        </section>
+
+        <div class="controls">
+            <button class="reset-btn" id="resetBtn">Reset Garden</button>
+            <button id="saveBtn">Save Progress</button>
+        </div>
+    </div>
+
+    <footer>
+        <p>Mood Garden - Your emotional garden grows with your feelings</p>
+    </footer>
+
+    <script>
+        // Mood Garden Application
+        document.addEventListener('DOMContentLoaded', () => {
+            // State management
+            const moodGardenState = {
+                currentMood: null,
+                moodHistory: [],
+                plants: [],
+                gardenSize: { width: 0, height: 0 },
+                plantGrowthStage: 0,
+                lastUpdate: null,
+                theme: 'light'
+            };
+
+            // Mood data
+            const moodData = {
+                happy: { emoji: '😊', color: '#FFD700', intensity: 5 },
+                sad: { emoji: '😢', color: '#4169E1', intensity: 2 },
+                excited: { emoji: '🤩', color: '#FF4500', intensity: 4 },
+                calm: { emoji: '😌', color: '#87CEEB', intensity: 3 },
+                anxious: { emoji: '😰', color: '#A9A9A9', intensity: 2 },
+                angry: { emoji: '😠', color: '#FF0000', intensity: 3 }
+            };
+
+            // Plant growth stages
+            const plantGrowthStages = {
+                seedling: { minMood: 1, maxMood: 2, color: '#8B4513', name: 'Seedling' },
+                sprout: { minMood: 2, maxMood: 3, color: '#228B22', name: 'Sprout' },
+                mature: { minMood: 3, maxMood: 4, color: '#32CD32', name: 'Mature' },
+                bloom: { minMood: 4, maxMood: 5, color: '#FF69B4', name: 'Bloom' },
+                wilt: { minMood: 0, maxMood: 1, color: '#A9A9A9', name: 'Wilt' }
+            };
+
+            // DOM Elements
+            const moodGrid = document.getElementById('moodGrid');
+            const garden = document.getElementById('garden');
+            const historyBar = document.getElementById('historyBar');
+            const plantCountEl = document.getElementById('plantCount');
+            const avgMoodEl = document.getElementById('avgMood');
+            const growthStageEl = document.getElementById('growthStage');
+            const currentMoodEl = document.getElementById('currentMood');
+            const resetBtn = document.getElementById('resetBtn');
+            const saveBtn = document.getElementById('saveBtn');
+
+            // Initialize garden size
+            function initGardenSize() {
+                const rect = garden.getBoundingClientRect();
+                moodGardenState.gardenSize = {
+                    width: rect.width,
+                    height: rect.height
+                };
+            }
+
+            // Initialize garden
+            function initGarden() {
+                initGardenSize();
+                window.addEventListener('resize', () => {
+                    initGardenSize();
+                });
+            }
+
+            // Mood selection handler
+            function selectMood(mood) {
+                // Update state
+                moodGardenState.currentMood = mood;
+                moodGardenState.moodHistory.push({
+                    mood: mood,
+                    timestamp: new Date(),
+                    intensity: moodData[mood].intensity
+                });
+
+                // Update UI
+                document.querySelectorAll('.mood-card').forEach(card => {
+                    card.classList.remove('selected');
+                });
+                document.querySelector(`[data-mood="${mood}"]`).classList.add('selected');
+
+                // Update plant based on mood
+                updatePlant();
+
+                // Update history
+                updateHistory();
+
+                // Update plant info
+                updatePlantInfo();
+
+                // Add plant to garden
+                addPlant(mood);
+            }
+
+            // Add plant to garden
+            function addPlant(mood) {
+                const plant = document.createElement('div');
+                plant.className = 'plant';
+                plant.dataset.mood = mood;
+                
+                // Get mood intensity
+                const intensity = moodData[mood].intensity;
+                
+                // Determine plant size and position
+                const size = 30 + (intensity * 10);
+                const x = Math.random() * (moodGardenState.gardenSize.width - size);
+                const y = moodGardenState.gardenSize.height - 50 - size;
+                
+                plant.style.width = `${size}px`;
+                plant.style.height = `${size}px`;
+                plant.style.left = `${x}px`;
+                plant.style.bottom = `${y}px`;
+                plant.style.backgroundColor = moodData[mood].color;
+                plant.style.borderRadius = '50%';
+                plant.style.animation = 'bloom 0.5s ease-out';
+                
+                // Add to garden
+                garden.appendChild(plant);
+                
+                // Add to state
+                moodGardenState.plants.push({
+                    element: plant,
+                    mood: mood,
+                    size: size,
+                    x: x,
+                    y: y,
+                    growthStage: 'seedling'
+                });
+                
+                // Update plant info
+                updatePlantInfo();
+            }
+
+            // Update plant based on mood
+            function updatePlant() {
+                if (moodGardenState.currentMood) {
+                    const mood = moodGardenState.currentMood;
+                    const intensity = moodData[mood].intensity;
+                    
+                    // Update growth stage based on intensity
+                    if (intensity >= 4) {
+                        moodGardenState.plantGrowthStage = 3; // Bloom
+                    } else if (intensity >= 3) {
+                        moodGardenState.plantGrowthStage = 2; // Mature
+                    } else if (intensity >= 2) {
+                        moodGardenState.plantGrowthStage = 1; // Sprout
+                    } else {
+                        moodGardenState.plantGrowthStage = 0; // Seedling
+                    }
+                }
+            }
+
+            // Update history timeline
+            function updateHistory() {
+                historyBar.innerHTML = '';
+                
+                if (moodGardenState.moodHistory.length === 0) return;
+                
+                const recentMoods = moodGardenState.moodHistory.slice(-10);
+                
+                recentMoods.forEach((entry, index) => {
+                    const point = document.createElement('div');
+                    point.className = 'history-point';
+                    point.style.backgroundColor = moodData[entry.mood].color;
+                    point.title = `${entry.mood} (${entry.intensity}) - ${entry.timestamp.toLocaleTimeString()}`;
+                    point.dataset.mood = entry.mood;
+                    point.dataset.timestamp = entry.timestamp;
+                    point.dataset.intensity = entry.intensity;
+                    
+                    point.addEventListener('click', () => {
+                        selectMood(entry.mood);
+                    });
+                    
+                    historyBar.appendChild(point);
+                });
+            }
+
+            // Update plant information
+            function updatePlantInfo() {
+                plantCountEl.textContent = moodGardenState.plants.length;
+                
+                if (moodGardenState.moodHistory.length > 0) {
+                    const totalIntensity = moodGardenState.moodHistory.reduce((sum, entry) => sum + entry.intensity, 0);
+                    const avg = totalIntensity / moodGardenState.moodHistory.length;
+                    avgMoodEl.textContent = avg.toFixed(1);
+                } else {
+                    avgMoodEl.textContent = '0';
+                }
+                
+                const stageNames = Object.keys(plantGrowthStages);
+                if (moodGardenState.plantGrowthStage < stageNames.length) {
+                    growthStageEl.textContent = plantGrowthStages[stageNames[moodGardenState.plantGrowthStage]].name;
+                }
+                
+                currentMoodEl.textContent = moodGardenState.currentMood || 'None';
+            }
+
+            // Reset garden
+            function resetGarden() {
+                if (confirm('Are you sure you want to reset your garden? All data will be lost.')) {
+                    moodGardenState.currentMood = null;
+                    moodGardenState.moodHistory = [];
+                    moodGardenState.plants = [];
+                    moodGardenState.plantGrowthStage = 0;
+                    
+                    // Clear garden
+                    garden.innerHTML = '<div class="soil"></div>';
+                    
+                    // Reset UI
+                    document.querySelectorAll('.mood-card').forEach(card => {
+                        card.classList.remove('selected');
+                    });
+                    
+                    updateHistory();
+                    updatePlantInfo();
+                }
+            }
+
+            // Save progress
+            function saveProgress() {
+                localStorage.setItem('moodGardenState', JSON.stringify(moodGardenState));
+                alert('Progress saved successfully!');
+            }
+
+            // Load progress
+            function loadProgress() {
+                const saved = localStorage.getItem('moodGardenState');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    Object.assign(moodGardenState, parsed);
+                    updateHistory();
+                    updatePlantInfo();
+                }
+            }
+
+            // Event Listeners
+            moodGrid.addEventListener('click', (e) => {
+                const moodCard = e.target.closest('.mood-card');
+                if (moodCard) {
+                    const mood = moodCard.dataset.mood;
+                    selectMood(mood);
+                }
+            });
+
+            resetBtn.addEventListener('click', resetGarden);
+            saveBtn.addEventListener('click', saveProgress);
+
+            // Initialize
+            initGarden();
+            loadProgress();
+
+            // Add sample plant for demo
+            setTimeout(() => {
+                addPlant('happy');
+            }, 500);
+        });
+    </script>
+</body>
+</html>

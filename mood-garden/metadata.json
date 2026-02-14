@@ -1,0 +1,23 @@
+{
+  "title": "Mood Garden",
+  "description": "An interactive visualization that grows a digital garden based on your emotional inputs, with plants that bloom and change based on your current mood and daily emotional patterns.",
+  "category": "creative",
+  "slug": "mood-garden",
+  "date": "2026-02-14",
+  "benchmark": {
+    "phase1_seconds": 36.9,
+    "phase2_seconds": 146.7,
+    "total_seconds": 183.6,
+    "output_bytes": 20509,
+    "temperature": 0.7,
+    "attempt": 1,
+    "model": "qwen3-coder:14b-16k",
+    "parameter_size": "30.5B",
+    "quantization": "Q4_K_M",
+    "family": "qwen3moe",
+    "os": "Linux",
+    "arch": "aarch64",
+    "vram_gb": 18.9,
+    "compute": "Apple M1 Pro / 32GB RAM / 14 GPU cores"
+  }
+}
