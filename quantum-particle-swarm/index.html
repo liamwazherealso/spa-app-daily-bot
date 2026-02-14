@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Particle Swarm</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #ff7eb3, #ff758c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 10px rgba(255, 126, 179, 0.3);
+        }
+
+        .description {
+            font-size: 1.1rem;
+            opacity: 0.8;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            height: calc(100vh - 120px);
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .control-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .control-group {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .control-group h3 {
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            color: #ff7eb3;
+        }
+
+        .control-item {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #ff7eb3;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(255, 126, 179, 0.5);
+        }
+
+        select, button {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-bar {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            z-index: 10;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff7eb3;
+            box-shadow: 0 0 10px rgba(255, 126, 179, 0.5);
+        }
+
+        @media (max-width: 768px) {
+            main {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr auto;
+            }
+            
+            .control-panel {
+                position: relative;
+                max-height: 300px;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Quantum Particle Swarm</h1>
+        <p class="description">Place attractor points to guide colorful quantum particles in real-time, creating mesmerizing swarm patterns that respond to mouse movement and gravity physics.</p>
+    </header>
+
+    <main>
+        <div id="canvas-container">
+            <canvas id="particleCanvas"></canvas>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <h3>Particle Controls</h3>
+                <div class="control-item">
+                    <label for="particleCount">Particle Count: <span id="countValue">500</span></label>
+                    <input type="range" id="particleCount" min="100" max="2000" value="500">
+                </div>
+                <div class="control-item">
+                    <label for="gravity">Gravity: <span id="gravityValue">0.1</span></label>
+                    <input type="range" id="gravity" min="0" max="1" step="0.01" value="0.1">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Attractor Settings</h3>
+                <div class="control-item">
+                    <label for="attractorStrength">Strength: <span id="strengthValue">100</span></label>
+                    <input type="range" id="attractorStrength" min="10" max="200" value="100">
+                </div>
+                <div class="control-item">
+                    <label for="attractorRadius">Radius: <span id="radiusValue">50</span></label>
+                    <input type="range" id="attractorRadius" min="10" max="100" value="50">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Visual Settings</h3>
+                <div class="control-item">
+                    <label for="colorScheme">Color Scheme</label>
+                    <select id="colorScheme">
+                        <option value="rainbow">Rainbow</option>
+                        <option value="ocean">Ocean</option>
+                        <option value="sunset">Sunset</option>
+                        <option value="neon">Neon</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Actions</h3>
+                <button id="resetBtn">Reset Particles</button>
+                <button id="toggleAttractors">Toggle Attractors</button>
+            </div>
+        </div>
+    </main>
+
+    <div class="status-bar">
+        <div class="status-item">
+            <div class="status-indicator"></div>
+            <span>Particles: <span id="particleCountDisplay">500</span></span>
+        </div>
+        <div class="status-item">
+            <span>Attractors: <span id="attractorCount">0</span></span>
+        </div>
+        <div class="status-item">
+            <span>Mouse: <span id="mousePosition">0, 0</span></span>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        const state = {
+            particles: [],
+            attractors: [],
+            canvas: null,
+            ctx: null,
+            isDrawing: false,
+            particleCount: 500,
+            colorScheme: 'rainbow',
+            gravity: 0.1,
+            friction: 0.99,
+            attractorStrength: 100,
+            attractorRadius: 50,
+            lastTime: 0,
+            animationId: null,
+            mouse: { x: 0, y: 0, isDown: false }
+        };
+
+        // Particle class
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+                this.size = Math.random() * 3 + 1;
+                this.color = this.getColor();
+                this.trail = [];
+                this.maxTrailLength = 10;
+                this.life = 1;
+            }
+            
+            getColor() {
+                const schemes = {
+                    rainbow: () => `hsl(${Math.random() * 360}, 100%, 60%)`,
+                    ocean: () => `hsl(${Math.random() * 60 + 180}, 100%, 50%)`,
+                    sunset: () => `hsl(${Math.random() * 40 + 30}, 100%, 50%)`,
+                    neon: () => `hsl(${Math.random() * 30 + 240}, 100%, 60%)`
+                };
+                return schemes[state.colorScheme]();
+            }
+            
+            update() {
+                // Apply gravity and friction
+                this.vx *= state.friction;
+                this.vy *= state.friction;
+                
+                // Apply attractor forces
+                state.attractors.forEach(attractor => {
+                    const dx = attractor.x - this.x;
+                    const dy = attractor.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < attractor.radius) {
+                        const force = (attractor.radius - distance) / attractor.radius;
+                        this.vx += (dx / distance) * force * state.attractorStrength * 0.01;
+                        this.vy += (dy / distance) * force * state.attractorStrength * 0.01;
+                    }
+                });
+                
+                // Mouse interaction
+                const dx = state.mouse.x - this.x;
+                const dy = state.mouse.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 100) {
+                    const force = (100 - distance) / 100;
+                    this.vx += (dx / distance) * force * state.gravity * 0.5;
+                    this.vy += (dy / distance) * force * state.gravity * 0.5;
+                }
+                
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                // Add to trail
+                this.trail.push({ x: this.x, y: this.y });
+                if (this.trail.length > this.maxTrailLength) {
+                    this.trail.shift();
+                }
+            }
+            
+            draw(ctx) {
+                // Draw trail
+                for (let i = 0; i < this.trail.length; i++) {
+                    const point = this.trail[i];
+                    const alpha = i / this.trail.length * 0.5;
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, this.size * (i / this.trail.length), 0, Math.PI * 2);
+                    ctx.fillStyle = this.color.replace(')', `, ${alpha})`).replace('hsl', 'hsla');
+                    ctx.fill();
+                }
+                
+                // Draw particle
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Add glow effect
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 2, 0, Math.PI * 2);
+                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size * 2);
+                gradient.addColorStop(0, this.color);
+                gradient.addColorStop(1, 'transparent');
+                ctx.fillStyle = gradient;
+                ctx.fill();
+            }
+        }
+
+        // Attractor class
+        class Attractor {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 20;
+                this.strength = 100;
+                this.pulse = 0;
+            }
+            
+            update() {
+                this.pulse = (this.pulse + 0.05) % (Math.PI * 2);
+            }
+            
+            draw(ctx) {
+                // Draw glow effect
+                const pulseSize = this.radius + Math.sin(this.pulse) * 5;
+                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, pulseSize);
+                gradient.addColorStop(0, 'rgba(255, 126, 179, 0.8)');
+                gradient.addColorStop(1, 'rgba(255, 126, 179, 0)');
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, pulseSize, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                // Draw core
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#ff7eb3';
+                ctx.fill();
+            }
+        }
+
+        // Initialize the application
+        function init() {
+            state.canvas = document.getElementById('particleCanvas');
+            state.ctx = state.canvas.getContext('2d');
+            
+            resize();
+            
+            // Setup event listeners
+            window.addEventListener('resize', resize);
+            state.canvas.addEventListener('mousemove', handleMouseMove);
+            state.canvas.addEventListener('mousedown', handleMouseDown);
+            state.canvas.addEventListener('mouseup', handleMouseUp);
+            state.canvas.addEventListener('mouseleave', handleMouseUp);
+            
+            // Setup UI controls
+            document.getElementById('particleCount').addEventListener('input', function() {
+                state.particleCount = parseInt(this.value);
+                document.getElementById('countValue').textContent = state.particleCount;
+                document.getElementById('particleCountDisplay').textContent = state.particleCount;
+                createParticles(state.particleCount);
+            });
+            
+            document.getElementById('gravity').addEventListener('input', function() {
+                state.gravity = parseFloat(this.value);
+                document.getElementById('gravityValue').textContent = state.gravity.toFixed(2);
+            });
+            
+            document.getElementById('attractorStrength').addEventListener('input', function() {
+                state.attractorStrength = parseInt(this.value);
+                document.getElementById('strengthValue').textContent = state.attractorStrength;
+            });
+            
+            document.getElementById('attractorRadius').addEventListener('input', function() {
+                state.attractorRadius = parseInt(this.value);
+                document.getElementById('radiusValue').textContent = state.attractorRadius;
+            });
+            
+            document.getElementById('colorScheme').addEventListener('change', function() {
+                state.colorScheme = this.value;
+                createParticles(state.particleCount);
+            });
+            
+            document.getElementById('resetBtn').addEventListener('click', reset);
+            document.getElementById('toggleAttractors').addEventListener('click', function() {
+                state.isDrawing = !state.isDrawing;
+                this.textContent = state.isDrawing ? 'Disable Attractors' : 'Enable Attractors';
+            });
+            
+            // Create initial particles
+            createParticles(state.particleCount);
+            
+            // Start animation loop
+            animate();
+        }
+
+        // Create particles
+        function createParticles(count) {
+            state.particles = [];
+            for (let i = 0; i < count; i++) {
+                state.particles.push(new Particle(
+                    Math.random() * state.canvas.width,
+                    Math.random() * state.canvas.height
+                ));
+            }
+            document.getElementById('particleCountDisplay').textContent = count;
+        }
+
+        // Resize canvas
+        function resize() {
+            const container = document.getElementById('canvas-container');
+            state.canvas.width = container.clientWidth;
+            state.canvas.height = container.clientHeight;
+        }
+
+        // Mouse move handler
+        function handleMouseMove(e) {
+            const rect = state.canvas.getBoundingClientRect();
+            state.mouse.x = e.clientX - rect.left;
+            state.mouse.y = e.clientY - rect.top;
+            document.getElementById('mousePosition').textContent = `${Math.round(state.mouse.x)}, ${Math.round(state.mouse.y)}`;
+        }
+
+        // Mouse down handler
+        function handleMouseDown(e) {
+            if (state.isDrawing) {
+                const rect = state.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                state.attractors.push(new Attractor(x, y));
+                document.getElementById('attractorCount').textContent = state.attractors.length;
+            }
+        }
+
+        // Mouse up handler
+        function handleMouseUp() {
+            state.mouse.isDown = false;
+        }
+
+        // Reset particles
+        function reset() {
+            createParticles(state.particleCount);
+            state.attractors = [];
+            document.getElementById('attractorCount').textContent = '0';
+        }
+
+        // Animation loop
+        function animate(timestamp) {
+            if (!state.lastTime) state.lastTime = timestamp;
+            const deltaTime = timestamp - state.lastTime;
+            state.lastTime = timestamp;
+            
+            // Clear canvas with a semi-transparent overlay for trail effect
+            state.ctx.fillStyle = 'rgba(15, 12, 41, 0.1)';
+            state.ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
+            
+            // Update and draw attractors
+            state.attractors.forEach(attractor => {
+                attractor.update();
+                attractor.draw(state.ctx);
+            });
+            
+            // Update and draw particles
+            state.particles.forEach(particle => {
+                particle.update();
+                particle.draw(state.ctx);
+            });
+            
+            state.animationId = requestAnimationFrame(animate);
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

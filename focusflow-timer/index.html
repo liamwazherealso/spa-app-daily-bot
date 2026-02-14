@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusFlow Timer</title>
+  <style>
+    /* Base styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 500px;
+      width: 100%;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      padding: 30px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Header styles */
+    .app-header h1 {
+      color: #2c3e50;
+      font-weight: 700;
+      font-size: 2.2rem;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: #7f8c8d;
+      font-size: 1rem;
+      margin-bottom: 30px;
+    }
+
+    /* Timer display */
+    .timer-display {
+      margin: 30px 0;
+    }
+
+    .time-remaining {
+      font-size: 4rem;
+      font-weight: 700;
+      color: #2c3e50;
+      margin-bottom: 20px;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 2px;
+    }
+
+    .session-info {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .session-type {
+      font-weight: 600;
+      color: #3498db;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-size: 1.1rem;
+    }
+
+    .session-count {
+      color: #95a5a6;
+      font-size: 1rem;
+    }
+
+    /* Progress bar */
+    .timer-progress {
+      height: 8px;
+      background: #ecf0f1;
+      border-radius: 4px;
+      margin: 25px 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #3498db, #2ecc71);
+      border-radius: 4px;
+      width: 100%;
+      transition: width 1s linear;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin: 30px 0;
+      flex-wrap: wrap;
+    }
+
+    .control-btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 50px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-width: 100px;
+      font-size: 1rem;
+    }
+
+    #startBtn {
+      background: #2ecc71;
+      color: white;
+    }
+
+    #pauseBtn {
+      background: #f39c12;
+      color: white;
+    }
+
+    #resetBtn {
+      background: #e74c3c;
+      color: white;
+    }
+
+    #skipBtn {
+      background: #3498db;
+      color: white;
+    }
+
+    .control-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .control-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Settings */
+    .settings {
+      margin: 30px 0;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 15px;
+    }
+
+    .setting-group {
+      margin: 15px 0;
+    }
+
+    .setting-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #2c3e50;
+    }
+
+    .setting-group input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #ecf0f1;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .setting-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #3498db;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .setting-group span {
+      display: inline-block;
+      margin-left: 10px;
+      font-weight: 600;
+      color: #3498db;
+    }
+
+    /* Stats */
+    .stats {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #ecf0f1;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-value {
+      display: block;
+      font-size: 2rem;
+      font-weight: 700;
+      color: #2c3e50;
+    }
+
+    .stat-label {
+      display: block;
+      font-size: 0.9rem;
+      color: #7f8c8d;
+      margin-top: 5px;
+    }
+
+    /* Animations */
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .pulse {
+      animation: pulse 1.5s infinite;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.5s ease-out;
+    }
+
+    /* Responsive design */
+    @media (max-width: 600px) {
+      .container {
+        padding: 20px;
+      }
+      
+      .time-remaining {
+        font-size: 3rem;
+      }
+      
+      .controls {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .control-btn {
+        width: 100%;
+        max-width: 200px;
+      }
+      
+      .stats {
+        flex-direction: column;
+        gap: 15px;
+      }
+      
+      .setting-group {
+        margin: 10px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header class="app-header">
+      <h1>FocusFlow Timer</h1>
+      <p class="subtitle">Optimize your focus sessions</p>
+    </header>
+    
+    <div class="timer-display">
+      <div class="time-remaining" id="timeRemaining">25:00</div>
+      <div class="timer-progress">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="session-info">
+        <span class="session-type" id="sessionType">Work</span>
+        <span class="session-count" id="sessionCount">Session 1</span>
+      </div>
+    </div>
+    
+    <div class="controls">
+      <button class="control-btn" id="startBtn">Start</button>
+      <button class="control-btn" id="pauseBtn">Pause</button>
+      <button class="control-btn" id="resetBtn">Reset</button>
+      <button class="control-btn" id="skipBtn">Skip</button>
+    </div>
+    
+    <div class="settings">
+      <div class="setting-group">
+        <label for="workDuration">Work Duration (min)</label>
+        <input type="range" id="workDuration" min="5" max="60" value="25">
+        <span id="workDurationValue">25</span>
+      </div>
+      <div class="setting-group">
+        <label for="breakDuration">Break Duration (min)</label>
+        <input type="range" id="breakDuration" min="1" max="30" value="5">
+        <span id="breakDurationValue">5</span>
+      </div>
+    </div>
+    
+    <div class="stats">
+      <div class="stat-item">
+        <span class="stat-value" id="completedSessions">0</span>
+        <span class="stat-label">Sessions</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value" id="totalFocusTime">0</span>
+        <span class="stat-label">Focus (min)</span>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // State management
+    const state = {
+      isRunning: false,
+      isPaused: false,
+      currentSession: 'work', // 'work' or 'break'
+      timeRemaining: 25 * 60, // in seconds
+      workDuration: 25 * 60,
+      breakDuration: 5 * 60,
+      completedSessions: 0,
+      totalFocusTime: 0,
+      timerInterval: null,
+      startTime: null,
+      pausedTime: 0,
+      sessionHistory: []
+    };
+
+    // DOM Elements
+    const timeRemainingEl = document.getElementById('timeRemaining');
+    const progressBarEl = document.getElementById('progressBar');
+    const sessionTypeEl = document.getElementById('sessionType');
+    const sessionCountEl = document.getElementById('sessionCount');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const skipBtn = document.getElementById('skipBtn');
+    const workDurationSlider = document.getElementById('workDuration');
+    const breakDurationSlider = document.getElementById('breakDuration');
+    const workDurationValue = document.getElementById('workDurationValue');
+    const breakDurationValue = document.getElementById('breakDurationValue');
+    const completedSessionsEl = document.getElementById('completedSessions');
+    const totalFocusTimeEl = document.getElementById('totalFocusTime');
+
+    // Initialize
+    function init() {
+      updateDisplay();
+      updateSettings();
+      loadSettings();
+    }
+
+    // Update time display
+    function updateDisplay() {
+      const minutes = Math.floor(state.timeRemaining / 60);
+      const seconds = state.timeRemaining % 60;
+      timeRemainingEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      
+      // Update progress bar
+      const totalTime = state.currentSession === 'work' ? state.workDuration : state.breakDuration;
+      const progress = ((totalTime - state.timeRemaining) / totalTime) * 100;
+      progressBarEl.style.width = `${progress}%`;
+      
+      // Update session info
+      sessionTypeEl.textContent = state.currentSession.charAt(0).toUpperCase() + state.currentSession.slice(1);
+      sessionCountEl.textContent = `Session ${state.completedSessions + 1}`;
+      
+      // Update stats
+      completedSessionsEl.textContent = state.completedSessions;
+      totalFocusTimeEl.textContent = Math.floor(state.totalFocusTime / 60);
+    }
+
+    // Start timer
+    function startTimer() {
+      if (state.isRunning) return;
+      
+      state.isRunning = true;
+      state.isPaused = false;
+      state.startTime = Date.now() - (state.pausedTime || 0);
+      
+      state.timerInterval = setInterval(() => {
+        state.timeRemaining--;
+        updateDisplay();
+        
+        if (state.timeRemaining <= 0) {
+          completeSession();
+        }
+      }, 1000);
+      
+      startBtn.textContent = 'Running';
+      startBtn.disabled = true;
+    }
+
+    // Pause timer
+    function pauseTimer() {
+      if (!state.isRunning) return;
+      
+      state.isRunning = false;
+      state.isPaused = true;
+      clearInterval(state.timerInterval);
+      
+      // Save paused time for resume
+      state.pausedTime = Date.now() - state.startTime;
+      
+      startBtn.textContent = 'Resume';
+      startBtn.disabled = false;
+    }
+
+    // Reset timer
+    function resetTimer() {
+      clearInterval(state.timerInterval);
+      state.isRunning = false;
+      state.isPaused = false;
+      state.timeRemaining = state.currentSession === 'work' ? state.workDuration : state.breakDuration;
+      state.pausedTime = 0;
+      startBtn.textContent = 'Start';
+      startBtn.disabled = false;
+      updateDisplay();
+    }
+
+    // Skip current session
+    function skipTimer() {
+      if (state.isRunning) {
+        clearInterval(state.timerInterval);
+        state.isRunning = false;
+        state.isPaused = false;
+        startBtn.textContent = 'Start';
+        startBtn.disabled = false;
+      }
+      
+      switchSession();
+    }
+
+    // Complete current session
+    function completeSession() {
+      clearInterval(state.timerInterval);
+      state.isRunning = false;
+      state.isPaused = false;
+      
+      // Record session completion time
+      const sessionTime = state.currentSession === 'work' ? state.workDuration : state.breakDuration;
+      const actualTime = sessionTime - state.timeRemaining;
+      
+      state.sessionHistory.push({
+        type: state.currentSession,
+        duration: sessionTime,
+        actualTime: actualTime
+      });
+      
+      // Update stats
+      if (state.currentSession === 'work') {
+        state.completedSessions++;
+        state.totalFocusTime += sessionTime;
+      }
+      
+      // Switch to next session
+      switchSession();
+    }
+
+    // Switch between work and break sessions
+    function switchSession() {
+      state.currentSession = state.currentSession === 'work' ? 'break' : 'work';
+      
+      // Calculate adaptive work duration
+      if (state.currentSession === 'work') {
+        const adaptiveDuration = calculateAdaptiveDuration();
+        state.workDuration = adaptiveDuration;
+        state.timeRemaining = adaptiveDuration;
+      } else {
+        state.timeRemaining = state.breakDuration;
+      }
+      
+      // Reset paused time
+      state.pausedTime = 0;
+      
+      // Update display
+      updateDisplay();
+      
+      // Reset start button
+      startBtn.textContent = 'Start';
+      startBtn.disabled = false;
+    }
+
+    // Calculate adaptive work duration based on performance
+    function calculateAdaptiveDuration() {
+      if (state.sessionHistory.length < 3) {
+        return 25 * 60; // Default 25 minutes
+      }
+      
+      // Get last 3 work sessions
+      const recentWorkSessions = state.sessionHistory
+        .filter(session => session.type === 'work')
+        .slice(-3);
+      
+      if (recentWorkSessions.length < 3) {
+        return 25 * 60; // Default 25 minutes
+      }
+      
+      // Calculate average efficiency (actual time vs expected time)
+      let totalEfficiency = 0;
+      for (const session of recentWorkSessions) {
+        const efficiency = session.actualTime / session.duration;
+        totalEfficiency += efficiency;
+      }
+      
+      const avgEfficiency = totalEfficiency / recentWorkSessions.length;
+      
+      // Adjust work duration based on efficiency
+      let newDuration = 25 * 60; // Start with default 25 minutes
+      
+      if (avgEfficiency > 0.9) {
+        // High efficiency - increase duration
+        newDuration = Math.min(45 * 60, 25 * 60 + 5 * 60);
+      } else if (avgEfficiency < 0.7) {
+        // Low efficiency - decrease duration
+        newDuration = Math.max(15 * 60, 25 * 60 - 5 * 60);
+      }
+      
+      return newDuration;
+    }
+
+    // Update settings
+    function updateSettings() {
+      state.workDuration = parseInt(workDurationSlider.value) * 60;
+      state.breakDuration = parseInt(breakDurationSlider.value) * 60;
+      
+      workDurationValue.textContent = workDurationSlider.value;
+      breakDurationValue.textContent = breakDurationSlider.value;
+      
+      // If timer is not running, update current session duration
+      if (!state.isRunning) {
+        state.timeRemaining = state.currentSession === 'work' ? state.workDuration : state.breakDuration;
+        updateDisplay();
+      }
+      
+      saveSettings();
+    }
+
+    // Save settings to localStorage
+    function saveSettings() {
+      const settings = {
+        workDuration: state.workDuration,
+        breakDuration: state.breakDuration
+      };
+      localStorage.setItem('focusFlowSettings', JSON.stringify(settings));
+    }
+
+    // Load settings from localStorage
+    function loadSettings() {
+      const savedSettings = localStorage.getItem('focusFlowSettings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        state.workDuration = settings.workDuration;
+        state.breakDuration = settings.breakDuration;
+        
+        workDurationSlider.value = state.workDuration / 60;
+        breakDurationSlider.value = state.breakDuration / 60;
+        
+        workDurationValue.textContent = workDurationSlider.value;
+        breakDurationValue.textContent = breakDurationSlider.value;
+        
+        state.timeRemaining = state.currentSession === 'work' ? state.workDuration : state.breakDuration;
+        updateDisplay();
+      }
+    }
+
+    // Event Listeners
+    startBtn.addEventListener('click', startTimer);
+    pauseBtn.addEventListener('click', pauseTimer);
+    resetBtn.addEventListener('click', resetTimer);
+    skipBtn.addEventListener('click', skipTimer);
+    
+    workDurationSlider.addEventListener('input', updateSettings);
+    breakDurationSlider.addEventListener('input', updateSettings);
+
+    // Initialize the app
+    init();
+  </script>
+</body>
+</html>

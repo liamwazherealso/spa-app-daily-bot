@@ -1,0 +1,7 @@
+{
+  "title": "Quantum Particle Swarm",
+  "description": "An interactive visualization where users can place attractor points that guide colorful quantum particles in real-time, creating mesmerizing swarm patterns that respond to mouse movement and gravity physics.",
+  "category": "animation",
+  "slug": "quantum-particle-swarm",
+  "date": "2026-02-14"
+}
