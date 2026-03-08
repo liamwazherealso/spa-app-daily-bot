@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Paper Lantern Festival</title>
+<style>
+:root{
+  --bg-start:#0b1d33;
+  --bg-end:#1a3b5f;
+  --lantern-base:#ffebcd;
+  --firefly-base:#ffecb3;
+  --text-color:#fff;
+  --header-height:60px;
+  --footer-height:30px;
+  --control-size:40px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:sans-serif;
+  color:var(--text-color);
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  overflow:hidden;
+}
+header,footer{
+  flex:0 0 auto;
+  height:var(--header-height);
+  line-height:var(--header-height);
+  text-align:center;
+  background:rgba(0,0,0,0.3);
+}
+header h1{font-size:1.8rem;}
+footer{height:var(--footer-height);line-height:var(--footer-height);font-size:0.8rem;}
+canvas{flex:1 1 auto;display:block;}
+#controls{
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+button,input[type=checkbox],input[type=range]{
+  background:rgba(255,255,255,0.1);
+  border:none;
+  color:var(--text-color);
+  padding:8px 12px;
+  border-radius:4px;
+  cursor:pointer;
+}
+button:hover{background:rgba(255,255,255,0.2);}
+input[type=range]{width:120px;}
+@media (max-width:600px){
+  header h1{font-size:1.4rem;}
+  footer{font-size:0.7rem;}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Paper Lantern Festival</h1>
+</header>
+<canvas id="garden"></canvas>
+<div id="controls">
+  <button id="addLanternBtn">Add Lantern</button>
+  <label><input type="checkbox" id="toggleFireflies" checked> Fireflies</label>
+  <label>Speed: <input type="range" id="speedSlider" min="0.5" max="3" step="0.1" value="1"></label>
+</div>
+<footer>© 2026 Lantern Light</footer>
+<script>
+(() => {
+  const canvas=document.getElementById('garden');
+  const ctx=canvas.getContext('2d');
+  const header=document.querySelector('header');
+  const footer=document.querySelector('footer');
+  const addLanternBtn=document.getElementById('addLanternBtn');
+  const toggleFireflies=document.getElementById('toggleFireflies');
+  const speedSlider=document.getElementById('speedSlider');
+
+  const state={
+    lanterns:[],
+    fireflies:[],
+    showFireflies:true,
+    speedFactor:1,
+    pointer:{x:0,y:0,active:false},
+    time:0
+  };
+
+  function resizeCanvas(){
+    const h=header.offsetHeight+footer.offsetHeight;
+    canvas.width=window.innerWidth;
+    canvas.height=window.innerHeight-h;
+  }
+  window.addEventListener('resize',resizeCanvas);
+  resizeCanvas();
+
+  class Lantern{
+    constructor(x,y){
+      this.x=x; this.y=y;
+      this.radius=30+Math.random()*20;
+      const hue=30+Math.random()*30;
+      this.color=`hsl(${hue},70%,80%)`;
+      this.opacity=0.8;
+      this.flickerPhase=Math.random()*Math.PI*2;
+      this.driftSpeed=20+Math.random()*10;
+    }
+    update(dt){
+      this.flickerPhase+=0.02*dt;
+      this.opacity=0.8+0.2*Math.sin(this.flickerPhase);
+      this.y-=this.driftSpeed*dt/1000;
+      if(this.y+this.radius<0) this.y=canvas.height+this.radius;
+    }
+    draw(ctx){
+      const grd=ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,this.radius*1.5);
+      grd.addColorStop(0,this.color);
+      grd.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.globalAlpha=this.opacity;
+      ctx.fillStyle=grd;
+      ctx.beginPath();
+      ctx.arc(this.x,this.y,this.radius,0,Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha=1;
+    }
+  }
+
+  class Firefly{
+    constructor(){
+      this.x=Math.random()*canvas.width;
+      this.y=Math.random()*canvas.height;
+      this.radius=4+Math.random()*2;
+      const hue=60+Math.random()*60;
+      this.color=`hsl(${hue},70%,70%)`;
+      this.vx=(Math.random()-0.5)*30;
+      this.vy=(Math.random()-0.5)*30;
+    }
+    update(dt,pointer){
+      const noise=0.1;
+      this.vx+=noise*(Math.random()-0.5);
+      this.vy+=noise*(Math.random()-0.5);
+      const speed=40;
+      const len=Math.hypot(this.vx,this.vy);
+      if(len>0){this.vx=this.vx/len*speed;this.vy=this.vy/len*speed;}
+      this.x+=this.vx*dt/1000;
+      this.y+=this.vy*dt/1000;
+      if(pointer.active){
+        const dx=pointer.x-this.x,dy=pointer.y-this.y;
+        const dist=Math.hypot(dx,dy);
+        if(dist<150){
+          const dirX=dx/dist,dirY=dy/dist;
+          this.vx+=dirX*50*dt/1000;
+          this.vy+=dirY*50*dt/1000;
+        }
+      }
+      if(this.x<0)this.x=canvas.width;
+      if(this.x>canvas.width)this.x=0;
+      if(this.y<0)this.y=canvas.height;
+      if(this.y>canvas.height)this.y=0;
+    }
+    draw(ctx){
+      ctx.filter='blur(2px)';
+      const grd=ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,this.radius*3);
+      grd.addColorStop(0,this.color);
+      grd.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=grd;
+      ctx.beginPath();
+      ctx.arc(this.x,this.y,this.radius,0,Math.PI*2);
+      ctx.fill();
+      ctx.filter='none';
+    }
+  }
+
+  function addLantern(x,y){
+    const lantern=new Lantern(x||canvas.width/2,y||canvas.height/2);
+    state.lanterns.push(lantern);
+  }
+
+  function init(){
+    for(let i=0;i<10;i++) addLantern();
+    for(let i=0;i<50;i++) state.fireflies.push(new Firefly());
+  }
+
+  canvas.addEventListener('click',e=>{
+    const rect=canvas.getBoundingClientRect();
+    addLantern(e.clientX-rect.left,e.clientY-rect.top);
+  });
+
+  canvas.addEventListener('mousemove',e=>{
+    const rect=canvas.getBoundingClientRect();
+    state.pointer.x=e.clientX-rect.left;
+    state.pointer.y=e.clientY-rect.top;
+    state.pointer.active=true;
+  });
+  canvas.addEventListener('mouseleave',()=>state.pointer.active=false);
+  canvas.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    const rect=canvas.getBoundingClientRect();
+    const touch=e.touches[0];
+    state.pointer.x=touch.clientX-rect.left;
+    state.pointer.y=touch.clientY-rect.top;
+    state.pointer.active=true;
+  },{passive:false});
+  canvas.addEventListener('touchend',()=>state.pointer.active=false);
+
+  addLanternBtn.addEventListener('click',()=>addLantern());
+  toggleFireflies.addEventListener('change',e=>state.showFireflies=e.target.checked);
+  speedSlider.addEventListener('input',e=>state.speedFactor=e.target.value);
+
+  function drawBackground(){
+    const grd=ctx.createLinearGradient(0,0,0,canvas.height);
+    grd.addColorStop(0,`var(--bg-start)`);
+    grd.addColorStop(1,`var(--bg-end)`);
+    ctx.fillStyle=grd;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+
+  function loop(timestamp){
+    const dt=timestamp-state.time;
+    state.time=timestamp;
+    state.lanterns.forEach(l=>l.update(dt*state.speedFactor));
+    if(state.showFireflies) state.fireflies.forEach(f=>f.update(dt*state.speedFactor,state.pointer));
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawBackground();
+    state.lanterns.forEach(l=>l.draw(ctx));
+    if(state.showFireflies) state.fireflies.forEach(f=>f.draw(ctx));
+    requestAnimationFrame(loop);
+  }
+
+  init();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

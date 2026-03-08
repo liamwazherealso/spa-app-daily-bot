@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chemical Equation Balancer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+:root{
+  --color-bg:#fafafa;
+  --color-primary:#3f51b5;
+  --color-accent:#ff5722;
+  --color-text:#212121;
+  --color-success:#4caf50;
+  --color-error:#f44336;
+  --radius:6px;
+  --font:'Roboto',sans-serif;
+  --shadow:0 2px 6px rgba(0,0,0,0.15);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);background:var(--color-bg);color:var(--color-text);display:grid;grid-template-rows:auto 1fr auto auto auto;min-height:100vh;}
+header{padding:1rem;background:var(--color-primary);color:#fff;text-align:center;}
+header h1{margin-bottom:.2rem;font-size:1.8rem;}
+header p{font-size:.9rem;margin-top:.2rem;}
+main{display:flex;flex-direction:column;gap:1rem;padding:1rem;}
+#workspace{display:flex;gap:1rem;flex:1;min-height:200px;}
+.panel{flex:1;border:2px dashed #ddd;border-radius:var(--radius);padding:.5rem;min-height:100px;display:flex;flex-wrap:wrap;align-content:flex-start;}
+#arrow{display:flex;align-items:center;justify-content:center;font-size:2rem;width:60px;}
+#palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:.5rem;padding:.5rem;border:1px solid #ddd;border-radius:var(--radius);background:#fff;}
+.molecule{background:#fff;border:1px solid #ddd;border-radius:var(--radius);padding:.3rem .6rem;margin:.3rem;display:inline-flex;align-items:center;cursor:grab;box-shadow:var(--shadow);transition:transform .1s;}
+.molecule:active{transform:scale(.95);}
+.coeff-input{width:30px;margin-left:.3rem;text-align:center;}
+button{background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius);padding:.6rem 1rem;margin:0 .3rem;cursor:pointer;transition:background .2s;}
+button:hover{background:var(--color-accent);}
+button:disabled{background:#aaa;cursor:not-allowed;}
+#toolbar{display:flex;justify-content:center;align-items:center;}
+#feedback{padding:.5rem;border-radius:var(--radius);min-height:40px;}
+#feedback.success{background:var(--color-success);color:#fff;}
+#feedback.error{background:var(--color-error);color:#fff;}
+#drawerToggle{display:none;position:absolute;top:1rem;left:1rem;background:var(--color-primary);color:#fff;border-radius:50%;width:40px;height:40px;align-items:center;justify-content:center;cursor:pointer;z-index:10;}
+@media(max-width:768px){
+  #workspace{flex-direction:column;}
+  #arrow{width:100%;font-size:1.5rem;}
+  #toolbar{flex-wrap:wrap;}
+  #palette{display:none;}
+  #drawerToggle{display:flex;}
+}
+@media(max-width:480px){
+  button{padding:.5rem .8rem;font-size:.9rem;}
+}
+@keyframes shake{0%{transform:translateX(0);}20%{transform:translateX(-5px);}40%{transform:translateX(5px);}60%{transform:translateX(-5px);}80%{transform:translateX(5px);}100%{transform:translateX(0);}}
+.shake{animation:shake .5s;}
+#modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);align-items:center;justify-content:center;}
+#modalContent{background:#fff;border-radius:var(--radius);padding:1rem;max-width:90%;max-height:80%;overflow:auto;}
+#modalClose{float:right;font-size:1.2rem;cursor:pointer;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Chemical Equation Balancer</h1>
+  <p>Drag molecules to build and balance equations in real time.</p>
+</header>
+<div id="drawerToggle">&#9776;</div>
+<main>
+  <div id="workspace">
+    <div id="reactants" class="panel" data-side="reactants"></div>
+    <div id="arrow">→</div>
+    <div id="products" class="panel" data-side="products"></div>
+  </div>
+  <div id="palette"></div>
+  <div id="toolbar">
+    <button id="balanceBtn">Balance</button>
+    <button id="resetBtn">Reset</button>
+    <button id="undoBtn">Undo</button>
+    <button id="redoBtn">Redo</button>
+    <button id="showSolutionBtn">Show Solution</button>
+  </div>
+  <div id="feedback"></div>
+</main>
+<div id="modal">
+  <div id="modalContent">
+    <span id="modalClose">&times;</span>
+    <h2>Balanced Equation</h2>
+    <p id="solutionText"></p>
+  </div>
+</div>
+<script>
+(() => {
+  // Utility functions
+  const uuid = () => '_' + Math.random().toString(36).substr(2, 9);
+  const gcd = (a,b)=>b?gcd(b,a%b):a;
+  const lcm = (a,b)=>Math.abs(a*b)/gcd(a,b);
+  // Fraction class
+  class Fraction{
+    constructor(n,d=1){this.n=n;this.d=d;this.normalize();}
+    normalize(){let g=gcd(Math.abs(this.n),Math.abs(this.d));this.n/=g;this.d/=g;if(this.d<0){this.n=-this.n;this.d=-this.d;}}
+    add(f){return new Fraction(this.n*f.d+f.n*this.d,this.d*f.d);}
+    sub(f){return new Fraction(this.n*f.d-f.n*this.d,this.d*f.d);}
+    mul(f){return new Fraction(this.n*f.n,this.d*f.d);}
+    div(f){return new Fraction(this.n*f.d,this.d*f.n);}
+    toNumber(){return this.n/this.d;}
+    toString(){return `${this.n}/${this.d}`;}
+  }
+  // State
+  const state = {
+    reactants:[],
+    products:[],
+    history:[],
+    future:[],
+    palette:[
+      {id:'H2',formula:'H₂',atoms:{H:2}},
+      {id:'O2',formula:'O₂',atoms:{O:2}},
+      {id:'H2O',formula:'H₂O',atoms:{H:2,O:1}},
+      {id:'CO2',formula:'CO₂',atoms:{C:1,O:2}},
+      {id:'CH4',formula:'CH₄',atoms:{C:1,H:4}},
+      {id:'C6H12O6',formula:'C₆H₁₂O₆',atoms:{C:6,H:12,O:6}},
+      {id:'NH3',formula:'NH₃',atoms:{N:1,H:3}},
+      {id:'NO2',formula:'NO₂',atoms:{N:1,O:2}},
+      {id:'NaCl',formula:'NaCl',atoms:{Na:1,Cl:1}}
+    ]
+  };
+  const saveHistory = () => {
+    state.history.push(JSON.stringify(state));
+    state.future=[];
+    updateUndoRedo();
+  };
+  const restoreState = (s) => {
+    const parsed = JSON.parse(s);
+    state.reactants=parsed.reactants;
+    state.products=parsed.products;
+    renderWorkspace();
+  };
+  const updateUndoRedo = () => {
+    document.getElementById('undoBtn').disabled=state.history.length===0;
+    document.getElementById('redoBtn').disabled=state.future.length===0;
+  };
+  // Render functions
+  const renderPalette = () => {
+    const p=document.getElementById('palette');
+    p.innerHTML='';
+    state.palette.forEach(m=>{
+      const div=document.createElement('div');
+      div.className='molecule';
+      div.draggable=true;
+      div.dataset.id=m.id;
+      div.textContent=m.formula;
+      div.addEventListener('dragstart',e=>{
+        e.dataTransfer.setData('text/plain',m.id);
+        e.dataTransfer.effectAllowed='copy';
+      });
+      p.appendChild(div);
+    });
+  };
+  const renderWorkspace = () => {
+    ['reactants','products'].forEach(side=>{
+      const panel=document.getElementById(side);
+      panel.innerHTML='';
+      state[side].forEach((mol,i)=>{
+        const div=document.createElement('div');
+        div.className='molecule';
+        div.dataset.id=mol.id;
+        div.dataset.instance=mol.instanceId;
+        div.textContent=mol.formula;
+        const input=document.createElement('input');
+        input.type='number';
+        input.min='1';
+        input.value=mol.coeff;
+        input.className='coeff-input';
+        input.addEventListener('change',e=>{
+          const val=parseInt(e.target.value);
+          if(val<1){e.target.classList.add('shake');setTimeout(()=>e.target.classList.remove('shake'),500);return;}
+          mol.coeff=val;
+          saveHistory();
+        });
+        div.appendChild(input);
+        panel.appendChild(div);
+      });
+    });
+  };
+  const renderFeedback = (msg,type='')=>{
+    const fb=document.getElementById('feedback');
+    fb.textContent=msg;
+    fb.className='';
+    if(type==='success')fb.classList.add('success');
+    if(type==='error')fb.classList.add('error');
+  };
+  const buildEquationString = () => {
+    const format = (side)=>state[side].map(m=>`${m.coeff}${m.formula}`).join(' + ');
+    return `${format('reactants')} → ${format('products')}`;
+  };
+  // Drag & drop
+  const allowDrop = e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';};
+  const handleDrop = (e,side)=>{
+    e.preventDefault();
+    const id=e.dataTransfer.getData('text/plain');
+    const base = state.palette.find(m=>m.id===id);
+    if(!base)return;
+    const instanceId=uuid();
+    const newMol={...base,instanceId,coeff:1};
+    state[side].push(newMol);
+    renderWorkspace();
+    saveHistory();
+  };
+  document.getElementById('reactants').addEventListener('dragover',allowDrop);
+  document.getElementById('reactants').addEventListener('drop',e=>handleDrop(e,'reactants'));
+  document.getElementById('products').addEventListener('dragover',allowDrop);
+  document.getElementById('products').addEventListener('drop',e=>handleDrop(e,'products'));
+  // Buttons
+  document.getElementById('resetBtn').addEventListener('click',()=>{
+    state.reactants=[];state.products=[];renderWorkspace();renderFeedback('Cleared.');
+  });
+  document.getElementById('undoBtn').addEventListener('click',()=>{
+    if(state.history.length===0)return;
+    const last=state.history.pop();
+    state.future.push(JSON.stringify(state));
+    restoreState(last);
+  });
+  document.getElementById('redoBtn').addEventListener('click',()=>{
+    if(state.future.length===0)return;
+    const next=state.future.pop();
+    state.history.push(JSON.stringify(state));
+    restoreState(next);
+  });
+  document.getElementById('balanceBtn').addEventListener('click',()=>{
+    if(state.reactants.length===0||state.products.length===0){renderFeedback('Add molecules to both sides.','error');return;}
+    const elements=[];
+    const allMols=[...state.reactants,...state.products];
+    allMols.forEach(m=>Object.keys(m.atoms).forEach(el=>{if(!elements.includes(el))elements.push(el);}));
+    const matrix=[];
+    elements.forEach(el=>{
+      const row=[];
+      state.reactants.forEach(m=>row.push(new Fraction(m.atoms[el]||0,1)));
+      state.products.forEach(m=>row.push(new Fraction(-(m.atoms[el]||0),1)));
+      matrix.push(row);
+    });
+    // Gaussian elimination to RREF
+    const rows=matrix.length, cols=matrix[0].length;
+    let r=0;
+    for(let c=0;c<cols && r<rows;c++){
+      let pivot=r;
+      for(let i=r;i<rows;i++){
+        if(matrix[i][c].n!==0){pivot=i;break;}
+      }
+      if(matrix[pivot][c].n===0)continue;
+      [matrix[r],matrix[pivot]]=[matrix[pivot],matrix[r]];
+      const div=matrix[r][c];
+      for(let j=c;j<cols;j++)matrix[r][j]=matrix[r][j].div(div);
+      for(let i=0;i<rows;i++){
+        if(i!==r && matrix[i][c].n!==0){
+          const factor=matrix[i][c];
+          for(let j=c;j<cols;j++){
+            matrix[i][j]=matrix[i][j].sub(factor.mul(matrix[r][j]));
+          }
+        }
+      }
+      r++;
+    }
+    // Find free variable (last column if rank<cols)
+    const rank=r;
+    if(rank===cols){renderFeedback('Equation already balanced or no solution.','error');return;}
+    const freeIdx=cols-1;
+    const solution=new Array(cols).fill(new Fraction(0,1));
+    solution[freeIdx]=new Fraction(1,1);
+    for(let i=rank-1;i>=0;i--){
+      let sum=new Fraction(0,1);
+      for(let j=i+1;j<cols;j++){
+        sum=sum.add(matrix[i][j].mul(solution[j]));
+      }
+      solution[i]=sum.neg();
+    }
+    // Convert to integers
+    let l=1;
+    solution.forEach(f=>{l=lcm(l,f.d);});
+    const ints=solution.map(f=>f.mul(new Fraction(l,1)).n);
+    const g=ints.reduce((a,b)=>gcd(a,b));
+    const coeffs=ints.map(v=>v/g);
+    // Ensure all positive
+    if(coeffs.some(v=>v<0)){
+      for(let i=0;i<coeffs.length;i++)coeffs[i]*=-1;
+    }
+    // Update state
+    let idx=0;
+    state.reactants.forEach(m=>{m.coeff=coeffs[idx++];});
+    state.products.forEach(m=>{m.coeff=coeffs[idx++];});
+    renderWorkspace();
+    renderFeedback('Equation balanced!','success');
+  });
+  document.getElementById('showSolutionBtn').addEventListener('click',()=>{
+    const eq=buildEquationString();
+    document.getElementById('solutionText').textContent=eq;
+    document.getElementById('modal').style.display='flex';
+  });
+  document.getElementById('modalClose').addEventListener('click',()=>{document.getElementById('modal').style.display='none';});
+  document.getElementById('modal').addEventListener('click',e=>{if(e.target===e.currentTarget)document.getElementById('modal').style.display='none';});
+  // Drawer toggle
+  const drawer=document.getElementById('palette');
+  document.getElementById('drawerToggle').addEventListener('click',()=>{
+    if(drawer.style.display==='none' || drawer.style.display===''){
+      drawer.style.display='grid';
+    }else{
+      drawer.style.display='none';
+    }
+  });
+  // Initial render
+  renderPalette();
+  renderWorkspace();
+  updateUndoRedo();
+})();
+</script>
+</body>
+</html>

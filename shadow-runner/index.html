@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shadow Runner</title>
+<style>
+:root{
+  --bg:#121212;
+  --fg:#f5f5f5;
+  --primary:#ffeb3b;
+  --secondary:#4caf50;
+  --shadow:#555;
+  --font:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--fg)}
+#app{display:flex;flex-direction:column;height:100%}
+header{display:flex;justify-content:space-between;align-items:center;padding:0.5rem 1rem;background:rgba(0,0,0,0.3)}
+header h1{font-size:1.5rem}
+header button{background:var(--primary);color:#000;border:none;padding:0.5rem;border-radius:4px;cursor:pointer}
+header button:hover{transform:scale(1.05);transition:transform .15s}
+#gameContainer{flex:1;position:relative;overflow:hidden}
+canvas{width:100%;height:100%;display:block;background:#222}
+#hud{position:absolute;top:0;right:0;padding:0.5rem;display:flex;gap:1rem;font-size:0.9rem}
+#hud span{background:rgba(0,0,0,0.5);padding:0.2rem 0.4rem;border-radius:4px}
+#exitIcon{width:24px;height:24px}
+#modal{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;visibility:hidden}
+#modal.show{visibility:visible}
+#modalContent{background:#333;padding:1.5rem;border-radius:8px;text-align:center;animation:fadeIn .3s}
+#modalContent h2{margin-bottom:0.5rem}
+#modalContent p{margin-bottom:1rem}
+#modalContent button{background:var(--primary);color:#000;border:none;padding:0.5rem 1rem;border-radius:4px;cursor:pointer}
+#modalContent button:hover{transform:scale(1.05);transition:transform .15s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+#mobileControls{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);display:flex;gap:0.5rem;visibility:hidden}
+#mobileControls button{width:48px;height:48px;background:var(--primary);color:#000;border:none;border-radius:50%;font-size:1.5rem;cursor:pointer}
+#mobileControls button:hover{transform:scale(1.05);transition:transform .15s}
+@media (max-width:600px){#mobileControls{visibility:visible}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Shadow Runner</h1>
+    <button id="pauseBtn" aria-label="Pause">⏸</button>
+  </header>
+  <div id="gameContainer">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="hud">
+      <span id="score">Score: 0</span>
+      <span id="timer">Time: 0s</span>
+      <span id="lives">Lives: 3</span>
+      <img id="exitIcon" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjNGNhZjUwIi8+PHRleHQgeD0iMTIiIHk9IjE4IiBmb250LXNpemU9IjE4IiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5FPC90ZXh0Pjwvc3ZnPg==" alt="Exit"/>
+    </div>
+    <div id="modal">
+      <div id="modalContent">
+        <h2 id="modalTitle">Welcome</h2>
+        <p id="modalMsg">Press Start to begin.</p>
+        <button id="modalBtn">Start</button>
+      </div>
+    </div>
+  </div>
+  <div id="mobileControls">
+    <button id="leftBtn" aria-label="Left">←</button>
+    <button id="rightBtn" aria-label="Right">→</button>
+    <button id="upBtn" aria-label="Up">↑</button>
+    <button id="downBtn" aria-label="Down">↓</button>
+  </div>
+</div>
+<script>
+(() => {
+  const GAME = {
+    status: 'menu', // menu, playing, paused, gameover
+    player: { x: 400, y: 300, size: 20, speed: 200, color: '#ffeb3b' },
+    shadows: [],
+    exit: { x: 0, y: 0, size: 30, color: '#4caf50' },
+    score: 0,
+    time: 0,
+    lives: 3,
+    lastUpdate: 0,
+    trailTimer: 0,
+    trailInterval: 150,
+    canvas: null,
+    ctx: null,
+    width: 800,
+    height: 600,
+    keys: {},
+    touchDir: { left: false, right: false, up: false, down: false }
+  };
+
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const timerEl = document.getElementById('timer');
+  const livesEl = document.getElementById('lives');
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalMsg = document.getElementById('modalMsg');
+  const modalBtn = document.getElementById('modalBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+
+  function init() {
+    GAME.canvas = canvas;
+    GAME.ctx = ctx;
+    GAME.width = canvas.width;
+    GAME.height = canvas.height;
+    resetGame();
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('keydown', e => GAME.keys[e.key] = true);
+    window.addEventListener('keyup', e => GAME.keys[e.key] = false);
+    pauseBtn.addEventListener('click', togglePause);
+    modalBtn.addEventListener('click', startGame);
+    ['leftBtn','rightBtn','upBtn','downBtn'].forEach(id=>{
+      const btn=document.getElementById(id);
+      btn.addEventListener('pointerdown',()=>{GAME.touchDir[id.slice(0,4)] = true});
+      btn.addEventListener('pointerup',()=>{GAME.touchDir[id.slice(0,4)] = false});
+    });
+    requestAnimationFrame(gameLoop);
+  }
+
+  function resizeCanvas() {
+    // Canvas keeps logical size 800x600; CSS scales it
+    // Nothing else needed
+  }
+
+  function resetGame() {
+    GAME.player.x = GAME.width / 2;
+    GAME.player.y = GAME.height / 2;
+    GAME.shadows = [];
+    GAME.exit.x = Math.random() * (GAME.width - 60) + 30;
+    GAME.exit.y = Math.random() * (GAME.height - 60) + 30;
+    GAME.score = 0;
+    GAME.time = 0;
+    GAME.lives = 3;
+    GAME.lastUpdate = 0;
+    GAME.trailTimer = 0;
+    updateHUD();
+  }
+
+  function updateHUD() {
+    scoreEl.textContent = `Score: ${GAME.score}`;
+    timerEl.textContent = `Time: ${Math.floor(GAME.time)}s`;
+    livesEl.textContent = `Lives: ${GAME.lives}`;
+  }
+
+  function togglePause() {
+    if (GAME.status === 'playing') {
+      GAME.status = 'paused';
+      pauseBtn.textContent = '▶';
+    } else if (GAME.status === 'paused') {
+      GAME.status = 'playing';
+      pauseBtn.textContent = '⏸';
+    }
+  }
+
+  function startGame() {
+    modal.classList.remove('show');
+    GAME.status = 'playing';
+    pauseBtn.textContent = '⏸';
+    resetGame();
+  }
+
+  function gameLoop(timestamp) {
+    if (!GAME.lastUpdate) GAME.lastUpdate = timestamp;
+    const delta = timestamp - GAME.lastUpdate;
+    GAME.lastUpdate = timestamp;
+
+    if (GAME.status === 'playing') {
+      update(delta);
+      render();
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function update(delta) {
+    movePlayer(delta);
+    GAME.trailTimer += delta;
+    if (GAME.trailTimer >= GAME.trailInterval) {
+      addShadowSegment();
+      GAME.trailTimer = 0;
+    }
+    fadeShadows(delta);
+    if (checkCollision(GAME.player, GAME.exit)) {
+      handleExit();
+    } else {
+      for (const seg of GAME.shadows) {
+        if (checkCollision(GAME.player, seg)) {
+          handleHit();
+          break;
+        }
+      }
+    }
+    GAME.time += delta / 1000;
+    GAME.score = Math.floor(GAME.time * 10);
+    updateHUD();
+  }
+
+  function movePlayer(delta) {
+    const dir = { x:0, y:0 };
+    const speed = GAME.player.speed * (delta/1000);
+    if (GAME.keys['ArrowLeft']||GAME.keys['a']||GAME.touchDir.left) dir.x -= 1;
+    if (GAME.keys['ArrowRight']||GAME.keys['d']||GAME.touchDir.right) dir.x += 1;
+    if (GAME.keys['ArrowUp']||GAME.keys['w']||GAME.touchDir.up) dir.y -= 1;
+    if (GAME.keys['ArrowDown']||GAME.keys['s']||GAME.touchDir.down) dir.y += 1;
+    const len = Math.hypot(dir.x, dir.y);
+    if (len>0) {
+      dir.x/=len; dir.y/=len;
+      GAME.player.x += dir.x*speed;
+      GAME.player.y += dir.y*speed;
+      // Keep within bounds
+      GAME.player.x = Math.max(GAME.player.size/2, Math.min(GAME.width-GAME.player.size/2, GAME.player.x));
+      GAME.player.y = Math.max(GAME.player.size/2, Math.min(GAME.height-GAME.player.size/2, GAME.player.y));
+    }
+  }
+
+  function addShadowSegment() {
+    GAME.shadows.push({
+      x: GAME.player.x,
+      y: GAME.player.y,
+      size: GAME.player.size,
+      opacity: 1
+    });
+  }
+
+  function fadeShadows(delta) {
+    const fadeRate = 0.002; // per ms
+    for (let i=GAME.shadows.length-1;i>=0;i--) {
+      const seg = GAME.shadows[i];
+      seg.opacity -= fadeRate*delta;
+      if (seg.opacity <= 0) GAME.shadows.splice(i,1);
+    }
+  }
+
+  function checkCollision(a,b) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    const dist = Math.hypot(dx,dy);
+    return dist < (a.size + b.size)/2;
+  }
+
+  function handleExit() {
+    GAME.status = 'gameover';
+    modalTitle.textContent = 'You Win!';
+    modalMsg.textContent = `Score: ${GAME.score}`;
+    modal.classList.add('show');
+    pauseBtn.textContent = '⏸';
+  }
+
+  function handleHit() {
+    GAME.lives--;
+    if (GAME.lives <= 0) {
+      GAME.status = 'gameover';
+      modalTitle.textContent = 'Game Over';
+      modalMsg.textContent = `Score: ${GAME.score}`;
+      modal.classList.add('show');
+      pauseBtn.textContent = '⏸';
+    } else {
+      GAME.player.x = GAME.width / 2;
+      GAME.player.y = GAME.height / 2;
+    }
+  }
+
+  function render() {
+    const ctx = GAME.ctx;
+    ctx.clearRect(0,0,GAME.width,GAME.height);
+    // Exit
+    ctx.fillStyle = GAME.exit.color;
+    ctx.beginPath();
+    ctx.arc(GAME.exit.x, GAME.exit.y, GAME.exit.size/2, 0, Math.PI*2);
+    ctx.fill();
+    // Shadows
+    for (const seg of GAME.shadows) {
+      ctx.globalAlpha = seg.opacity;
+      ctx.fillStyle = GAME.shadow;
+      ctx.beginPath();
+      ctx.arc(seg.x, seg.y, seg.size/2, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // Player
+    ctx.fillStyle = GAME.player.color;
+    ctx.beginPath();
+    ctx.arc(GAME.player.x, GAME.player.y, GAME.player.size/2, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

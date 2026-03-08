@@ -1,0 +1,23 @@
+{
+  "title": "Echo Maze",
+  "description": "Navigate a maze where walls appear only after you echo your path, challenging memory and spatial awareness.",
+  "category": "game",
+  "slug": "echo-maze",
+  "date": "2026-03-08",
+  "benchmark": {
+    "phase1_seconds": 26.6,
+    "phase2_seconds": 25.9,
+    "total_seconds": 52.5,
+    "output_bytes": 9479,
+    "temperature": 0.8999999999999999,
+    "attempt": 3,
+    "model": "gpt-oss:20b",
+    "parameter_size": "20.9B",
+    "quantization": "MXFP4",
+    "family": "gptoss",
+    "os": "Linux",
+    "arch": "x86_64",
+    "vram_gb": 13.9,
+    "compute": "NVIDIA GeForce RTX 3090 / 24576 MiB / AMD Ryzen 5 3600 6-Core Processor / 15GB RAM"
+  }
+}

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Solar System Orbit Playground</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+:root{
+  --primary-bg:#111;
+  --secondary-bg:#222;
+  --accent:#ffcc00;
+  --text:#eee;
+  --font:"Segoe UI", Tahoma, sans-serif;
+  --radius:4px;
+  --trans:0.2s ease;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font:1rem var(--font);
+  color:var(--text);
+  background:linear-gradient(135deg,#0a0a0a,#1a1a1a);
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+}
+header{
+  background:var(--primary-bg);
+  padding:0.8rem 1rem;
+  text-align:center;
+  font-size:1.5rem;
+  box-shadow:0 2px 4px rgba(0,0,0,0.5);
+}
+footer{
+  background:var(--primary-bg);
+  padding:0.5rem 1rem;
+  text-align:center;
+  box-shadow:0 -2px 4px rgba(0,0,0,0.5);
+}
+.app{
+  flex:1;
+  display:grid;
+  grid-template-columns:250px 1fr;
+  gap:1rem;
+  padding:1rem;
+  overflow:hidden;
+}
+aside{
+  background:var(--secondary-bg);
+  padding:1rem;
+  border-radius:var(--radius);
+  overflow-y:auto;
+  box-shadow:0 2px 4px rgba(0,0,0,0.3);
+}
+aside fieldset{
+  border:1px solid var(--accent);
+  border-radius:var(--radius);
+  margin-bottom:1rem;
+  padding:0.5rem;
+}
+aside legend{
+  font-weight:bold;
+  padding:0 0.5rem;
+}
+label{
+  display:block;
+  margin:0.5rem 0;
+}
+input[type=range]{
+  width:100%;
+  -webkit-appearance:none;
+  height:8px;
+  background:#444;
+  border-radius:4px;
+  outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:16px;
+  height:16px;
+  background:var(--accent);
+  border-radius:50%;
+  cursor:pointer;
+  transition:transform .2s;
+}
+input[type=range]:hover::-webkit-slider-thumb{
+  transform:scale(1.2);
+}
+button{
+  background:var(--accent);
+  color:var(--primary-bg);
+  border:none;
+  padding:0.6rem 1.2rem;
+  margin:0.2rem;
+  border-radius:var(--radius);
+  cursor:pointer;
+  transition:transform var(--trans);
+}
+button:hover{transform:scale(1.05);}
+button:focus{outline:2px solid var(--accent);}
+canvas{
+  display:block;
+  width:100%;
+  height:100%;
+  background:var(--primary-bg);
+  border-radius:var(--radius);
+  box-shadow:0 0 10px rgba(0,0,0,0.5);
+}
+.controls-toggle{
+  display:none;
+  position:absolute;
+  top:1rem;
+  right:1rem;
+}
+@media(max-width:768px){
+  .app{grid-template-columns:1fr;}
+  aside{display:none;}
+  .controls-toggle{display:block;}
+}
+</style>
+</head>
+<body>
+<header>
+  Solar System Orbit Playground
+</header>
+<div class="controls-toggle">
+  <button id="toggleControls" aria-expanded="false" aria-controls="controls">☰ Controls</button>
+</div>
+<main class="app">
+  <aside id="controls" aria-label="Planet Controls"></aside>
+  <canvas id="orbitCanvas" aria-label="Solar system simulation"></canvas>
+</main>
+<footer>
+  <button id="playPause" aria-pressed="true">Pause</button>
+  <button id="reset">Reset</button>
+</footer>
+<script>
+(() => {
+  const canvas = document.getElementById('orbitCanvas');
+  const ctx = canvas.getContext('2d');
+  const playPauseBtn = document.getElementById('playPause');
+  const resetBtn = document.getElementById('reset');
+  const controlsAside = document.getElementById('controls');
+  const toggleBtn = document.getElementById('toggleControls');
+  let animationId;
+  let paused = false;
+  let lastTime = 0;
+  const orbitScaleFactor = 80; // pixels per AU
+  const baseSpeedRadPerSec = 0.1; // base speed for Earth
+
+  const initialPlanets = [
+    {name:"Mercury", color:"#a0a0a0", baseRadius:2, orbitRadiusAU:0.39, speedFactor:4.15},
+    {name:"Venus",   color:"#e5c07b", baseRadius:4, orbitRadiusAU:0.72, speedFactor:1.62},
+    {name:"Earth",   color:"#61afef", baseRadius:5, orbitRadiusAU:1.00, speedFactor:1.00},
+    {name:"Mars",    color:"#e06c75", baseRadius:4, orbitRadiusAU:1.52, speedFactor:0.53},
+    {name:"Jupiter", color:"#d19a66", baseRadius:10, orbitRadiusAU:5.20, speedFactor:0.08},
+    {name:"Saturn",  color:"#c678dd", baseRadius:9, orbitRadiusAU:9.58, speedFactor:0.03},
+    {name:"Uranus",  color:"#56b6c2", baseRadius:8, orbitRadiusAU:19.20, speedFactor:0.01},
+    {name:"Neptune", color:"#98c379", baseRadius:8, orbitRadiusAU:30.05, speedFactor:0.006},
+    {name:"Pluto",   color:"#d4d4d4", baseRadius:2, orbitRadiusAU:39.50, speedFactor:0.004}
+  ];
+  let planets = JSON.parse(JSON.stringify(initialPlanets));
+
+  function init() {
+    resizeCanvas();
+    createControls();
+    window.addEventListener('resize', resizeCanvas);
+    playPauseBtn.addEventListener('click', togglePause);
+    resetBtn.addEventListener('click', resetSimulation);
+    toggleBtn.addEventListener('click', toggleControls);
+    animationId = requestAnimationFrame(animate);
+  }
+
+  function resizeCanvas() {
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+  }
+
+  function createControls() {
+    controlsAside.innerHTML = '';
+    planets.forEach(p => {
+      const fieldset = document.createElement('fieldset');
+      const legend = document.createElement('legend');
+      legend.textContent = p.name;
+      fieldset.appendChild(legend);
+
+      // Size slider
+      const sizeLabel = createSlider(p.name, 'scale', 'Size', 0.5, 3, 0.01, p.scale);
+      fieldset.appendChild(sizeLabel);
+
+      // Distance slider
+      const distLabel = createSlider(p.name, 'orbitScale', 'Distance', 0.5, 2, 0.01, 1);
+      fieldset.appendChild(distLabel);
+
+      // Speed slider
+      const speedLabel = createSlider(p.name, 'speedFactor', 'Speed', 0.5, 3, 0.01, p.speedFactor);
+      fieldset.appendChild(speedLabel);
+
+      controlsAside.appendChild(fieldset);
+    });
+  }
+
+  function createSlider(planetName, attr, labelText, min, max, step, value) {
+    const label = document.createElement('label');
+    label.htmlFor = `${planetName}-${attr}`;
+    label.textContent = `${labelText}: `;
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.id = `${planetName}-${attr}`;
+    input.min = min;
+    input.max = max;
+    input.step = step;
+    input.value = value;
+    input.dataset.planet = planetName;
+    input.dataset.attr = attr;
+    input.addEventListener('input', onSliderChange);
+    label.appendChild(input);
+    return label;
+  }
+
+  function onSliderChange(e) {
+    const planetName = e.target.dataset.planet;
+    const attr = e.target.dataset.attr;
+    const value = parseFloat(e.target.value);
+    const planet = planets.find(p => p.name === planetName);
+    if (!planet) return;
+    planet[attr] = value;
+    if (attr === 'speedFactor') {
+      planet.speedRadPerSec = baseSpeedRadPerSec * value;
+    }
+  }
+
+  function togglePause() {
+    paused = !paused;
+    playPauseBtn.textContent = paused ? 'Play' : 'Pause';
+    playPauseBtn.setAttribute('aria-pressed', !paused);
+  }
+
+  function resetSimulation() {
+    planets = JSON.parse(JSON.stringify(initialPlanets));
+    planets.forEach(p => {
+      p.speedRadPerSec = baseSpeedRadPerSec * p.speedFactor;
+    });
+    createControls();
+  }
+
+  function toggleControls() {
+    const isHidden = controlsAside.style.display === 'none';
+    controlsAside.style.display = isHidden ? 'block' : 'none';
+    toggleBtn.setAttribute('aria-expanded', !isHidden);
+  }
+
+  function animate(time) {
+    if (!lastTime) lastTime = time;
+    const dt = (time - lastTime) / 1000; // seconds
+    if (!paused) {
+      planets.forEach(p => {
+        p.angle = (p.angle + (p.speedRadPerSec || baseSpeedRadPerSec) * dt) % (2 * Math.PI);
+      });
+    }
+    draw();
+    lastTime = time;
+    animationId = requestAnimationFrame(animate);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+
+    // Sun
+    ctx.beginPath();
+    ctx.arc(cx, cy, 10, 0, 2 * Math.PI);
+    ctx.fillStyle = '#ffdd00';
+    ctx.fill();
+
+    planets.forEach(p => {
+      const orbitRadius = p.orbitRadiusAU * orbitScaleFactor * (p.orbitScale || 1);
+      // Orbit path
+      ctx.beginPath();
+      ctx.arc(cx, cy, orbitRadius, 0, 2 * Math.PI);
+      ctx.strokeStyle = 'rgba(200,200,200,0.2)';
+      ctx.stroke();
+
+      // Planet position
+      const angle = p.angle || 0;
+      const x = cx + orbitRadius * Math.cos(angle);
+      const y = cy + orbitRadius * Math.sin(angle);
+
+      ctx.beginPath();
+      ctx.arc(x, y, p.baseRadius * (p.scale || 1), 0, 2 * Math.PI);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+    });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

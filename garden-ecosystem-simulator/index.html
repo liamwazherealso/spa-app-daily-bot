@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Garden Ecosystem Simulator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+:root {
+  --primary: #4caf50;
+  --secondary: #ffeb3b;
+  --accent: #ff9800;
+  --bg: #fafafa;
+  --text: #333;
+  --card-bg: #fff;
+  --shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+* { box-sizing: border-box; margin:0; padding:0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height:1.6; }
+header, footer { padding:1rem; background: linear-gradient(135deg,var(--primary),var(--secondary)); color:white; text-align:center; }
+header { display:flex; justify-content:space-between; align-items:center; }
+header h1 { font-size:1.5rem; }
+header button { background:var(--accent); border:none; padding:0.5rem 1rem; border-radius:4px; color:white; cursor:pointer; }
+header button:hover { opacity:0.9; }
+
+.main { display:flex; flex-wrap:wrap; padding:1rem; }
+.canvas-container { flex:2; min-width:300px; position:relative; }
+#gardenCanvas { width:100%; height:auto; border:1px solid #ddd; border-radius:8px; background:white; box-shadow:var(--shadow); }
+.control-panel { flex:1; min-width:250px; margin-left:1rem; }
+.control-panel h2 { margin-bottom:0.5rem; font-size:1.2rem; }
+.palette { display:grid; grid-template-columns:repeat(auto-fill,minmax(60px,1fr)); gap:0.5rem; margin-bottom:1rem; }
+.palette img { width:100%; cursor:pointer; border:2px solid transparent; border-radius:4px; transition:border-color .2s; }
+.palette img.selected, .palette img:hover { border-color:var(--accent); }
+
+.water-controls { margin-bottom:1rem; }
+.water-controls input[type=range] { width:100%; }
+.stats { background:var(--card-bg); padding:1rem; border-radius:8px; box-shadow:var(--shadow); }
+.stats p { margin-bottom:0.5rem; }
+
+footer { font-size:0.8rem; }
+
+@media (max-width:900px) {
+  .main { flex-direction:column; }
+  .control-panel { margin-left:0; margin-top:1rem; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Garden Ecosystem Simulator</h1>
+  <button id="resetBtn">Reset</button>
+</header>
+
+<div class="main">
+  <div class="canvas-container">
+    <canvas id="gardenCanvas"></canvas>
+  </div>
+  <aside class="control-panel">
+    <h2>Plant Palette</h2>
+    <div class="palette" id="palette"></div>
+    <h2>Water Controls</h2>
+    <div class="water-controls">
+      <button id="waterAllBtn">Water All</button>
+      <input type="range" id="waterSlider" min="0" max="5" step="0.5" value="1">
+      <label for="waterSlider">Water Level: <span id="waterLevelLabel">1</span></label>
+    </div>
+    <h2>Stats</h2>
+    <div class="stats">
+      <p>Total Plants: <span id="totalPlants">0</span></p>
+      <p>Water Used: <span id="waterUsed">0</span> units</p>
+      <p>Time Elapsed: <span id="timeElapsed">0</span> s</p>
+    </div>
+  </aside>
+</div>
+
+<footer>
+  &copy; 2026 Garden Ecosystem Simulator
+</footer>
+
+<script>
+const app = {
+  config: { rows: 20, cols: 20, cellSize: 30 },
+  garden: [], // 2D array of Cell
+  species: {}, // species definitions
+  selectedSpecies: null,
+  water: { level: 1, max: 5 },
+  time: 0,
+  waterUsed: 0,
+  splashArray: [], // {x, y, alpha}
+  canvas: null,
+  ctx: null,
+  intervalId: null,
+  animationId: null
+};
+
+class Cell {
+  constructor(r, c) {
+    this.row = r; this.col = c;
+    this.plant = null;
+  }
+}
+
+class Plant {
+  constructor(species) {
+    this.species = species;
+    this.age = 0;
+    this.watered = 0;
+  }
+  getStage() {
+    const { stages } = this.species;
+    for (let i = stages.length-1; i>=0; i--) {
+      if (this.age >= stages[i].minAge && this.watered >= stages[i].minWater) return i;
+    }
+    return 0;
+  }
+}
+
+function initSpecies() {
+  app.species = {
+    sunflower: {
+      id:'sunflower',
+      name:'Sunflower',
+      stages:[
+        {minAge:0, minWater:0, scale:0.3},
+        {minAge:10, minWater:1, scale:0.5},
+        {minAge:20, minWater:3, scale:0.7},
+        {minAge:35, minWater:5, scale:1.0}
+      ],
+      waterPerTick:0.2,
+      img:"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><circle cx='32' cy='32' r='30' fill='#FFD700'/></svg>"
+    },
+    cucumber: {
+      id:'cucumber',
+      name:'Cucumber',
+      stages:[
+        {minAge:0, minWater:0, scale:0.3},
+        {minAge:8, minWater:1, scale:0.5},
+        {minAge:16, minWater:3, scale:0.7},
+        {minAge:24, minWater:5, scale:1.0}
+      ],
+      waterPerTick:0.15,
+      img:"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect x='8' y='16' width='48' height='32' rx='8' ry='8' fill='#00FF00'/></svg>"
+    },
+    fern: {
+      id:'fern',
+      name:'Fern',
+      stages:[
+        {minAge:0, minWater:0, scale:0.3},
+        {minAge:12, minWater:1, scale:0.5},
+        {minAge:24, minWater:3, scale:0.7},
+        {minAge:36, minWater:5, scale:1.0}
+      ],
+      waterPerTick:0.18,
+      img:"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><path d='M32 48 Q20 32 32 16 Q44 32 32 48' fill='#006400'/></svg>"
+    }
+  };
+}
+
+function initGarden() {
+  const { rows, cols } = app.config;
+  app.garden = [];
+  for (let r=0; r<rows; r++) {
+    const row = [];
+    for (let c=0; c<cols; c++) {
+      row.push(new Cell(r,c));
+    }
+    app.garden.push(row);
+  }
+}
+
+function setupCanvas() {
+  app.canvas = document.getElementById('gardenCanvas');
+  app.ctx = app.canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  app.canvas.addEventListener('click', canvasClick);
+}
+
+function resizeCanvas() {
+  const { rows, cols, cellSize } = app.config;
+  const width = cols * cellSize;
+  const height = rows * cellSize;
+  app.canvas.width = width;
+  app.canvas.height = height;
+}
+
+function canvasClick(e) {
+  const rect = app.canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const { cellSize } = app.config;
+  const col = Math.floor(x / cellSize);
+  const row = Math.floor(y / cellSize);
+  plantAt(row, col);
+}
+
+function plantAt(row, col) {
+  if (!app.selectedSpecies) return;
+  const cell = app.garden[row][col];
+  if (cell.plant) return; // already occupied
+  const species = app.species[app.selectedSpecies];
+  cell.plant = new Plant(species);
+  updateStats();
+}
+
+function waterAll() {
+  app.water.level = app.water.max;
+  document.getElementById('waterSlider').value = app.water.level;
+  document.getElementById('waterLevelLabel').textContent = app.water.level;
+  // Create splash at each cell
+  const { rows, cols, cellSize } = app.config;
+  for (let r=0; r<rows; r++) {
+    for (let c=0; c<cols; c++) {
+      const x = c * cellSize + cellSize/2;
+      const y = r * cellSize + cellSize/2;
+      app.splashArray.push({x,y,alpha:1});
+    }
+  }
+}
+
+function resetGarden() {
+  initGarden();
+  app.time = 0;
+  app.waterUsed = 0;
+  app.water.level = 1;
+  document.getElementById('waterSlider').value = 1;
+  document.getElementById('waterLevelLabel').textContent = 1;
+  app.splashArray = [];
+  updateStats();
+}
+
+function updateStats() {
+  const totalPlants = app.garden.flat().filter(cell=>cell.plant).length;
+  document.getElementById('totalPlants').textContent = totalPlants;
+  document.getElementById('waterUsed').textContent = app.waterUsed.toFixed(1);
+  document.getElementById('timeElapsed').textContent = app.time;
+}
+
+function render() {
+  const { rows, cols, cellSize } = app.config;
+  const ctx = app.ctx;
+  ctx.clearRect(0,0,app.canvas.width,app.canvas.height);
+  // Draw grid
+  ctx.strokeStyle = '#e0e0e0';
+  ctx.lineWidth = 1;
+  for (let r=0; r<=rows; r++) {
+    ctx.beginPath();
+    ctx.moveTo(0, r*cellSize);
+    ctx.lineTo(cols*cellSize, r*cellSize);
+    ctx.stroke();
+  }
+  for (let c=0; c<=cols; c++) {
+    ctx.beginPath();
+    ctx.moveTo(c*cellSize, 0);
+    ctx.lineTo(c*cellSize, rows*cellSize);
+    ctx.stroke();
+  }
+  // Draw plants
+  app.garden.forEach(row => row.forEach(cell => {
+    if (cell.plant) {
+      const stageIdx = cell.plant.getStage();
+      const stage = cell.plant.species.stages[stageIdx];
+      const img = new Image();
+      img.src = cell.plant.species.img;
+      const size = cellSize * stage.scale;
+      const x = cell.col * cellSize + (cellSize - size)/2;
+      const y = cell.row * cellSize + (cellSize - size)/2;
+      ctx.drawImage(img, x, y, size, size);
+    }
+  }));
+  // Draw splashes
+  const toRemove = [];
+  app.splashArray.forEach((splash, i) => {
+    ctx.globalAlpha = splash.alpha;
+    ctx.fillStyle = 'rgba(0,162,232,0.6)';
+    ctx.beginPath();
+    ctx.arc(splash.x, splash.y, 15, 0, Math.PI*2);
+    ctx.fill();
+    splash.alpha -= 0.02;
+    if (splash.alpha <= 0) toRemove.push(i);
+  });
+  ctx.globalAlpha = 1;
+  toRemove.reverse().forEach(i=>app.splashArray.splice(i,1));
+  app.animationId = requestAnimationFrame(render);
+}
+
+function simulationTick() {
+  app.time++;
+  const { water } = app;
+  const { rows, cols, cellSize } = app.config;
+  app.garden.forEach(row => row.forEach(cell => {
+    if (cell.plant) {
+      cell.plant.age++;
+      // Water consumption
+      const addedWater = water.level * cell.plant.species.waterPerTick;
+      cell.plant.watered += addedWater;
+      app.waterUsed += addedWater;
+    }
+  }));
+  updateStats();
+}
+
+function initPalette() {
+  const palette = document.getElementById('palette');
+  Object.values(app.species).forEach(spec => {
+    const img = document.createElement('img');
+    img.src = spec.img;
+    img.title = spec.name;
+    img.dataset.id = spec.id;
+    img.addEventListener('click', () => {
+      app.selectedSpecies = spec.id;
+      document.querySelectorAll('#palette img').forEach(el=>el.classList.remove('selected'));
+      img.classList.add('selected');
+    });
+    palette.appendChild(img);
+  });
+}
+
+function initControls() {
+  document.getElementById('waterAllBtn').addEventListener('click', waterAll);
+  const slider = document.getElementById('waterSlider');
+  slider.addEventListener('input', e => {
+    app.water.level = parseFloat(e.target.value);
+    document.getElementById('waterLevelLabel').textContent = app.water.level;
+  });
+  document.getElementById('resetBtn').addEventListener('click', resetGarden);
+}
+
+function init() {
+  initSpecies();
+  initGarden();
+  setupCanvas();
+  initPalette();
+  initControls();
+  updateStats();
+  render();
+  app.intervalId = setInterval(simulationTick, 1000);
+}
+window.addEventListener('load', init);
+</script>
+</body>
+</html>

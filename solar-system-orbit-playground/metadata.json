@@ -1,0 +1,23 @@
+{
+  "title": "Solar System Orbit Playground",
+  "description": "Explore planetary orbits by adjusting size, distance, and speed, and watch a realistic simulation unfold in real-time.",
+  "category": "simulation",
+  "slug": "solar-system-orbit-playground",
+  "date": "2026-03-08",
+  "benchmark": {
+    "phase1_seconds": 21.8,
+    "phase2_seconds": 30.4,
+    "total_seconds": 52.2,
+    "output_bytes": 8382,
+    "temperature": 0.7,
+    "attempt": 1,
+    "model": "gpt-oss:20b",
+    "parameter_size": "20.9B",
+    "quantization": "MXFP4",
+    "family": "gptoss",
+    "os": "Linux",
+    "arch": "x86_64",
+    "vram_gb": 13.9,
+    "compute": "NVIDIA GeForce RTX 3090 / 24576 MiB / AMD Ryzen 5 3600 6-Core Processor / 15GB RAM"
+  }
+}

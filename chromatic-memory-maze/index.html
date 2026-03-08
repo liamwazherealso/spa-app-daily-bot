@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chromatic Memory Maze</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --panel-size: 120px;
+    --panel-radius: 12px;
+    --panel-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    --flash-duration: 0.4s;
+    --correct-scale: 1.05;
+    --shake-duration: 0.3s;
+    --panel-bg: #e0e0e0;
+    --panel-colors: #1abc9c,#e74c3c,#f1c40f,#9b59b6,#27ae60,#e91e63;
+    --font-stack: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--font-stack);background:#f0f4f8;color:#333;}
+  a.skip-link{position:absolute;top:-40px;left:0;background:#333;color:#fff;padding:8px 12px;transition:top .3s;}
+  a.skip-link:focus{top:0;}
+  header{display:flex;justify-content:space-between;align-items:center;padding:1rem;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.1);}
+  header h1{font-size:1.8rem;}
+  #score{font-size:1rem;}
+  #timer{font-size:1rem;margin-left:1rem;}
+  #board{display:grid;grid-gap:1rem;justify-content:center;margin:2rem auto;max-width:480px;}
+  .panel{width:var(--panel-size);height:var(--panel-size);border:none;border-radius:var(--panel-radius);box-shadow:var(--panel-shadow);cursor:pointer;background:var(--panel-bg);transition:transform .2s,background-color .2s;}
+  .panel:focus{outline:2px solid #0066ff;}
+  .panel.correct{transform:scale(var(--correct-scale));box-shadow:0 0 8px #27ae60;}
+  .panel.wrong{animation:shake var(--shake-duration) ease;}
+  @keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-5px);}75%{transform:translateX(5px);}}
+  @keyframes flash{0%,100%{opacity:.3;}50%{opacity:1;}}
+  .panel.flash{animation:flash var(--flash-duration) ease-in-out;}
+  #controls{display:flex;justify-content:center;gap:1rem;margin-bottom:1rem;}
+  #controls button,#controls select{padding:.5rem 1rem;font-size:1rem;border:none;border-radius:6px;cursor:pointer;}
+  #controls button{background:#0066ff;color:#fff;}
+  #controls button:disabled{background:#aaa;}
+  #controls select{background:#fff;color:#333;}
+  #overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.5rem;opacity:0;pointer-events:none;transition:opacity .3s;}
+  #overlay.show{opacity:1;pointer-events:auto;}
+  #overlay .content{background:#222;border-radius:8px;padding:2rem 3rem;text-align:center;}
+  #overlay button{margin-top:1rem;padding:.5rem 1rem;font-size:1rem;background:#0066ff;color:#fff;border:none;border-radius:4px;cursor:pointer;}
+  @media(max-width:600px){#board{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:400px){#board{grid-template-columns:repeat(1,1fr);}}
+</style>
+</head>
+<body>
+<a href="#board" class="skip-link">Skip to game board</a>
+<header>
+  <h1>Chromatic Memory Maze</h1>
+  <div id="score">Round: 0 | Best: 0</div>
+  <div id="timer">0</div>
+</header>
+
+<div id="board" tabindex="0">
+  <button class="panel" data-index="0" aria-label="Panel 1"></button>
+  <button class="panel" data-index="1" aria-label="Panel 2"></button>
+  <button class="panel" data-index="2" aria-label="Panel 3"></button>
+  <button class="panel" data-index="3" aria-label="Panel 4"></button>
+  <button class="panel" data-index="4" aria-label="Panel 5"></button>
+  <button class="panel" data-index="5" aria-label="Panel 6"></button>
+</div>
+
+<div id="controls">
+  <button id="start">Start</button>
+  <select id="difficulty">
+    <option value="easy">Easy</option>
+    <option value="normal" selected>Normal</option>
+    <option value="hard">Hard</option>
+  </select>
+</div>
+
+<div id="overlay"><div class="content"><p id="overlayMsg"></p><button id="overlayBtn"></button></div></div>
+
+<script>
+const state = {
+  round:0,
+  best:0,
+  sequence:[],
+  userIdx:0,
+  isPlaying:false,
+  isAwaiting:false,
+  difficulty:'normal',
+  timerId:null,
+  timeLeft:0,
+  colors:[],
+  roundTimes:{easy:12,normal:10,hard:8},
+  flashDurations:{easy:0.5,normal:0.4,hard:0.3}
+};
+
+const panels=document.querySelectorAll('.panel');
+const startBtn=document.getElementById('start');
+const difficultySel=document.getElementById('difficulty');
+const scoreEl=document.getElementById('score');
+const timerEl=document.getElementById('timer');
+const overlay=document.getElementById('overlay');
+const overlayMsg=document.getElementById('overlayMsg');
+const overlayBtn=document.getElementById('overlayBtn');
+
+function init(){
+  loadBest();
+  startBtn.addEventListener('click',startGame);
+  difficultySel.addEventListener('change',e=>{state.difficulty=e.target.value;});
+  panels.forEach(btn=>btn.addEventListener('click',()=>handleInput(parseInt(btn.dataset.index))));
+  document.addEventListener('keydown',handleKey);
+  updateScore();
+}
+init();
+
+function startGame(){
+  state.round=0;
+  state.sequence=[];
+  state.userIdx=0;
+  state.isPlaying=false;
+  state.isAwaiting=false;
+  startBtn.disabled=true;
+  nextRound();
+}
+
+function nextRound(){
+  state.round++;
+  state.userIdx=0;
+  updateScore();
+  addToSequence();
+  playSequence().then(()=>{state.isPlaying=false;state.isAwaiting=true;startTimer();});
+}
+
+function addToSequence(){
+  const idx=Math.floor(Math.random()*state.colors.length);
+  state.sequence.push(idx);
+}
+
+async function playSequence(){
+  state.isPlaying=true;
+  state.isAwaiting=false;
+  stopTimer();
+  for(const idx of state.sequence){
+    await flashPanel(idx);
+  }
+}
+
+function flashPanel(idx){
+  return new Promise(res=>{
+    const btn=panels[idx];
+    const original=btn.style.backgroundColor;
+    btn.style.backgroundColor=state.colors[idx];
+    btn.classList.add('flash');
+    setTimeout(()=>{btn.classList.remove('flash');btn.style.backgroundColor=original;res();},state.flashDurations[state.difficulty]*1000);
+  });
+}
+
+function handleInput(idx){
+  if(!state.isAwaiting)return;
+  const expected=state.sequence[state.userIdx];
+  const btn=panels[idx];
+  if(idx===expected){
+    btn.classList.add('correct');
+    setTimeout(()=>btn.classList.remove('correct'),200);
+    state.userIdx++;
+    if(state.userIdx===state.sequence.length){
+      stopTimer();
+      overlayMsg.textContent=`Round ${state.round} complete!`;
+      overlayBtn.textContent='Next Round';
+      overlayBtn.onclick=()=>{overlay.classList.remove('show');nextRound();};
+      overlay.classList.add('show');
+      state.isAwaiting=false;
+    }
+  }else{
+    btn.classList.add('wrong');
+    setTimeout(()=>btn.classList.remove('wrong'),300);
+    stopTimer();
+    overlayMsg.textContent=`Wrong! Round ${state.round}`;
+    overlayBtn.textContent='Restart';
+    overlayBtn.onclick=()=>{overlay.classList.remove('show');startGame();};
+    overlay.classList.add('show');
+    state.isAwaiting=false;
+  }
+}
+
+function handleKey(e){
+  const map={ArrowUp:0,ArrowRight:1,ArrowDown:2,ArrowLeft:3,Digit1:0,Digit2:1,Digit3:2,Digit4:3,Digit5:4,Digit6:5};
+  const idx=map[e.key];
+  if(idx!==undefined)handleInput(idx);
+}
+
+function startTimer(){
+  state.timeLeft=state.roundTimes[state.difficulty];
+  timerEl.textContent=state.timeLeft;
+  state.timerId=setInterval(()=>{state.timeLeft--;timerEl.textContent=state.timeLeft;if(state.timeLeft<=0){clearInterval(state.timerId);state.timerId=null;timeout();}},1000);
+}
+
+function stopTimer(){
+  if(state.timerId){clearInterval(state.timerId);state.timerId=null;}
+}
+
+function timeout(){
+  overlayMsg.textContent=`Time's up! Round ${state.round}`;
+  overlayBtn.textContent='Restart';
+  overlayBtn.onclick=()=>{overlay.classList.remove('show');startGame();};
+  overlay.classList.add('show');
+  state.isAwaiting=false;
+}
+
+function updateScore(){
+  scoreEl.textContent=`Round: ${state.round} | Best: ${state.best}`;
+  if(state.round>state.best){state.best=state.round;localStorage.setItem('chromatic_best',state.best);}
+}
+
+function loadBest(){
+  const b=localStorage.getItem('chromatic_best');
+  if(b)state.best=+b;
+}
+
+document.documentElement.style.setProperty('--panel-colors',state.colors.join(','));
+</script>
+</body>
+</html>

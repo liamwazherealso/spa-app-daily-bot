@@ -1,0 +1,23 @@
+{
+  "title": "Chromatic Memory Maze",
+  "description": "Remember and replicate a dynamic color sequence that expands each round, testing your visual memory and speed.",
+  "category": "puzzle",
+  "slug": "chromatic-memory-maze",
+  "date": "2026-03-08",
+  "benchmark": {
+    "phase1_seconds": 28.6,
+    "phase2_seconds": 25.9,
+    "total_seconds": 54.4,
+    "output_bytes": 7991,
+    "temperature": 0.7,
+    "attempt": 1,
+    "model": "gpt-oss:20b",
+    "parameter_size": "20.9B",
+    "quantization": "MXFP4",
+    "family": "gptoss",
+    "os": "Linux",
+    "arch": "x86_64",
+    "vram_gb": 13.9,
+    "compute": "NVIDIA GeForce RTX 3090 / 24576 MiB / AMD Ryzen 5 3600 6-Core Processor / 15GB RAM"
+  }
+}

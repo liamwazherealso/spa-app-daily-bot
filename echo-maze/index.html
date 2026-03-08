@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Echo Maze</title>
+<style>
+  :root{
+    --bg:#111;
+    --fg:#f8f8f8;
+    --accent:#ffcc00;
+    --font:'Segoe UI',Arial,sans-serif;
+    --header-height:60px;
+    --footer-height:40px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font:1rem/1.5 var(--font);
+    color:var(--fg);
+    background:var(--bg);
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+  }
+  header,footer{
+    height:var(--header-height);
+    background:linear-gradient(135deg,#ffb400,#ffcc00);
+    color:var(--bg);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 1rem;
+    font-weight:bold;
+  }
+  header h1{margin:0;font-size:1.5rem;}
+  #status span{margin:0 1rem;}
+  button{
+    background:var(--accent);
+    color:var(--bg);
+    border:none;
+    padding:0.5rem 1rem;
+    margin-left:0.5rem;
+    font-weight:bold;
+    border-radius:4px;
+    cursor:pointer;
+    box-shadow:0 2px 4px rgba(0,0,0,0.3);
+    transition:background 0.2s;
+  }
+  button:hover{background:rgba(255,204,0,0.8);}
+  main{
+    flex:1;
+    position:relative;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:linear-gradient(135deg,#222,#333);
+  }
+  canvas{
+    background:var(--bg);
+    border:2px solid var(--accent);
+    border-radius:4px;
+    display:block;
+  }
+  /* Mobile Controls */
+  #mobileControls{
+    position:absolute;
+    bottom:1rem;
+    left:50%;
+    transform:translateX(-50%);
+    display:flex;
+    gap:0.5rem;
+    background:rgba(0,0,0,0.5);
+    padding:0.5rem;
+    border-radius:8px;
+  }
+  #mobileControls button{
+    width:48px;height:48px;
+    font-size:1.5rem;
+    border-radius:50%;
+  }
+  @media (min-width:601px){
+    #mobileControls{display:none;}
+  }
+  /* Modal */
+  #modal{
+    position:fixed;top:0;left:0;width:100%;height:100%;
+    background:rgba(0,0,0,0.7);display:flex;
+    align-items:center;justify-content:center;
+    z-index:10;
+  }
+  #modalContent{
+    background:var(--bg);color:var(--fg);
+    padding:2rem;border-radius:8px;max-width:90%;max-height:90%;
+    overflow:auto;box-shadow:0 4px 10px rgba(0,0,0,0.5);
+  }
+  #modalContent h2{margin-bottom:1rem;}
+  #modalContent p{margin-bottom:0.5rem;line-height:1.4;}
+  #closeModal{margin-top:1rem;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Echo Maze</h1>
+  <div id="status">
+    <span id="timer">00:00</span>
+    <span id="moves">0</span>
+  </div>
+  <div>
+    <button id="pauseBtn">Pause</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+</header>
+
+<main>
+  <canvas id="mazeCanvas"></canvas>
+  <div id="mobileControls">
+    <button data-dir="top">↑</button>
+    <button data-dir="right">→</button>
+    <button data-dir="bottom">↓</button>
+    <button data-dir="left">←</button>
+    <button id="echoBtn">Echo</button>
+  </div>
+</main>
+
+<footer>© 2026 Echo Maze</footer>
+
+<div id="modal">
+  <div id="modalContent">
+    <h2>How to Play</h2>
+    <p>Navigate the maze using arrow keys or WASD. The maze walls are hidden until you trigger an <strong>Echo</strong>.</p>
+    <p>Press <strong>Echo</strong> (space bar or Echo button) to reveal the walls along the path you have taken so far. Use this to remember your route.</p>
+    <p>Try to reach the exit (bottom right corner) as fast as possible.</p>
+    <button id="closeModal">Got it!</button>
+  </div>
+</div>
+
+<script>
+  // ---------- State ----------
+  const state = {
+    maze: null,
+    rows: 20,
+    cols: 20,
+    cellSize: 0,
+    player: {r:0,c:0},
+    timer:0,
+    moves:0,
+    running:false,
+    paused:false,
+    echoActive:false,
+    visibleCells:new Set(),
+    lastTime:0
+  };
+  // ---------- Elements ----------
+  const canvas=document.getElementById('mazeCanvas');
+  const ctx=canvas.getContext('2d');
+  const timerEl=document.getElementById('timer');
+  const movesEl=document.getElementById('moves');
+  const pauseBtn=document.getElementById('pauseBtn');
+  const resetBtn=document.getElementById('resetBtn');
+  const echoBtn=document.getElementById('echoBtn');
+  const mobileControls=document.getElementById('mobileControls');
+  const modal=document.getElementById('modal');
+  const closeModal=document.getElementById('closeModal');
+  // ---------- Utils ----------
+  function shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}} 
+  function opposite(d){return {top:'bottom',bottom:'top',left:'right',right:'left'}[d]}
+  function neighbour(r,c,dir){
+    switch(dir){
+      case 'top':return [r-1,c];
+      case 'bottom':return [r+1,c];
+      case 'left':return [r,c-1];
+      case 'right':return [r,c+1];
+    }
+  }
+  // ---------- Maze Generation ----------
+  function generateMaze(rows,cols){
+    const maze=Array.from({length:rows},(_,r)=>
+      Array.from({length:cols},(_,c)=>({
+        r,c,walls:{top:true,right:true,bottom:true,left:true},visited:false
+      }))
+    );
+    function carve(r,c){
+      maze[r][c].visited=true;
+      const dirs=['top','right','bottom','left'];
+      shuffle(dirs);
+      for(const dir of dirs){
+        const [nr,nc]=neighbour(r,c,dir);
+        if(nr<0||nr>=rows||nc<0||nc>=cols)continue;
+        if(maze[nr][nc].visited)continue;
+        maze[r][c].walls[dir]=false;
+        maze[nr][nc].walls[opposite(dir)]=false;
+        carve(nr,nc);
+      }
+    }
+    carve(0,0);
+    return maze;
+  }
+  // ---------- Rendering ----------
+  function draw(){
+    const {maze,cellSize,player,visibleCells}=state;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle='#555';
+    ctx.lineWidth=2;
+    for(const row of maze){
+      for(const cell of row){
+        const x=cell.c*cellSize;
+        const y=cell.r*cellSize;
+        if(visibleCells.has(`${cell.r},${cell.c}`)){
+          ctx.beginPath();
+          if(cell.walls.top)ctx.moveTo(x,y),ctx.lineTo(x+cellSize,y);
+          if(cell.walls.right)ctx.moveTo(x+cellSize,y),ctx.lineTo(x+cellSize,y+cellSize);
+          if(cell.walls.bottom)ctx.moveTo(x+cellSize,y+cellSize),ctx.lineTo(x,y+cellSize);
+          if(cell.walls.left)ctx.moveTo(x,y+cellSize),ctx.lineTo(x,y);
+          ctx.stroke();
+        }
+      }
+    }
+    // Player
+    const px=player.c*cellSize+cellSize/2;
+    const py=player.r*cellSize+cellSize/2;
+    ctx.fillStyle='#ffcc00';
+    ctx.beginPath();
+    ctx.arc(px,py,cellSize/4,0,Math.PI*2);
+    ctx.fill();
+  }
+  // ---------- Timer ----------
+  function updateTimer(){
+    const mins=Math.floor(state.timer/60).toString().padStart(2,'0');
+    const secs=Math.floor(state.timer%60).toString().padStart(2,'0');
+    timerEl.textContent=`${mins}:${secs}`;
+  }
+  // ---------- Movement ----------
+  function movePlayer(dir){
+    if(state.paused)return;
+    const {maze,player}=state;
+    const cell=maze[player.r][player.c];
+    if(cell.walls[dir])return;
+    const [nr,nc]=neighbour(player.r,player.c,dir);
+    state.player={r:nr,c:nc};
+    state.moves++;
+    movesEl.textContent=state.moves;
+    state.visibleCells.add(`${player.r},${player.c}`);
+  }
+  // ---------- Echo ----------
+  function triggerEcho(){
+    if(state.paused||state.echoActive)return;
+    state.echoActive=true;
+    // Keep walls visible for 2s
+    setTimeout(()=>{state.echoActive=false;state.visibleCells.clear();},2000);
+  }
+  // ---------- Game Loop ----------
+  function loop(now){
+    if(!state.running)return;
+    if(!state.paused){
+      const delta=(now-state.lastTime)/1000;
+      state.lastTime=now;
+      state.timer+=delta;
+      updateTimer();
+    }else{
+      state.lastTime=now;
+    }
+    draw();
+    requestAnimationFrame(loop);
+  }
+  // ---------- Resize ----------
+  function resizeCanvas(){
+    const w=canvas.clientWidth;
+    const h=canvas.clientHeight;
+    const dpi=window.devicePixelRatio||1;
+    canvas.width=w*dpi;
+    canvas.height=h*dpi;
+    ctx.scale(dpi,dpi);
+    state.cellSize=Math.min(w,h)/state.rows;
+  }
+  window.addEventListener('resize',()=>{
+    canvas.style.width='100%';
+    canvas.style.height='100%';
+    resizeCanvas();
+  });
+  // ---------- Event Listeners ----------
+  document.addEventListener('keydown',e=>{
+    if(e.key===' '){e.preventDefault();triggerEcho();return;}
+    const dirMap={'ArrowUp':'top','ArrowDown':'bottom','ArrowLeft':'left','ArrowRight':'right',
+                  'w':'top','s':'bottom','a':'left','d':'right'};
+    const dir=dirMap[e.key];
+    if(dir)movePlayer(dir);
+  });
+  pauseBtn.addEventListener('click',()=>{
+    state.paused=!state.paused;
+    pauseBtn.textContent=state.paused?'Resume':'Pause';
+  });
+  resetBtn.addEventListener('click',()=>{
+    state.running=false;
+    state.paused=false;
+    pauseBtn.textContent='Pause';
+    state.moves=0;
+    movesEl.textContent='0';
+    state.timer=0;
+    updateTimer();
+    state.visibleCells.clear();
+    state.player={r:0,c:0};
+    state.maze=generateMaze(state.rows,state.cols);
+    state.running=true;
+    state.lastTime=performance.now();
+    requestAnimationFrame(loop);
+  });
+  echoBtn.addEventListener('click',triggerEcho);
+  mobileControls.addEventListener('click',e=>{
+    if(e.target.dataset.dir)movePlayer(e.target.dataset.dir);
+  });
+  closeModal.addEventListener('click',()=>{modal.style.display='none';});
+  // ---------- Init ----------
+  function init(){
+    canvas.style.width='100%';
+    canvas.style.height='100%';
+    resizeCanvas();
+    state.maze=generateMaze(state.rows,state.cols);
+    state.running=true;
+    state.lastTime=performance.now();
+    requestAnimationFrame(loop);
+  }
+  init();
+</script>
+</body>
+</html>

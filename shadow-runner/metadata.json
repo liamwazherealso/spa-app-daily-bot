@@ -1,0 +1,23 @@
+{
+  "title": "Shadow Runner",
+  "description": "Navigate a character that leaves a shadow trail; the shadows become obstacles you must avoid to reach the exit.",
+  "category": "game",
+  "slug": "shadow-runner",
+  "date": "2026-03-08",
+  "benchmark": {
+    "phase1_seconds": 26.6,
+    "phase2_seconds": 27.9,
+    "total_seconds": 54.6,
+    "output_bytes": 9781,
+    "temperature": 0.7,
+    "attempt": 1,
+    "model": "gpt-oss:20b",
+    "parameter_size": "20.9B",
+    "quantization": "MXFP4",
+    "family": "gptoss",
+    "os": "Linux",
+    "arch": "x86_64",
+    "vram_gb": 13.9,
+    "compute": "NVIDIA GeForce RTX 3090 / 24576 MiB / AMD Ryzen 5 3600 6-Core Processor / 15GB RAM"
+  }
+}
