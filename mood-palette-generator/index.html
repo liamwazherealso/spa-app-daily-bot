@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mood Palette Generator</title>
+<style>
+:root{
+  --primary:#3a7bd5;
+  --secondary:#ff6b6b;
+  --bg:#f5f7fa;
+  --text:#222;
+  --border-radius:8px;
+  --shadow:0 4px 12px rgba(0,0,0,0.1);
+  --transition:0.2s ease;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+header{position:sticky;top:0;background:var(--bg);padding:0.75rem 1rem;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center;z-index:10;}
+header h1{font-size:1.5rem;}
+#help-btn{background:none;border:none;cursor:pointer;width:24px;height:24px;display:flex;align-items:center;justify-content:center;}
+#help-btn svg{fill:var(--text);width:100%;height:100%;}
+main{max-width:900px;margin:2rem auto;padding:0 1rem;}
+#mood-select{display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.5rem;}
+#mood-dropdown,#custom-mood{flex:1;padding:0.5rem;border:1px solid #ccc;border-radius:var(--border-radius);font-size:1rem;}
+#generate-btn{background:var(--primary);color:#fff;padding:0.6rem 1.2rem;border:none;border-radius:var(--border-radius);cursor:pointer;font-size:1rem;}
+#generate-btn:disabled{background:#999;cursor:not-allowed;}
+#palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:1rem;}
+.swatch{background:#000;color:#fff;border-radius:var(--border-radius);box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;justify-content:center;height:150px;position:relative;transition:transform var(--transition),box-shadow var(--transition);}
+.swatch:hover{transform:scale(1.05);box-shadow:0 6px 16px rgba(0,0,0,0.15);}
+.swatch span{font-weight:bold;margin-top:0.5rem;}
+.copy-btn{position:absolute;top:8px;right:8px;background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;}
+.copy-btn:hover{color:#ddd;}
+#tooltip{position:absolute;background:#333;color:#fff;padding:0.4rem 0.6rem;border-radius:var(--border-radius);font-size:0.85rem;opacity:0;transition:opacity var(--transition),transform var(--transition);transform:translateY(-10px);pointer-events:none;}
+#tooltip.show{opacity:1;transform:translateY(0);}
+footer{text-align:center;margin-top:3rem;font-size:0.9rem;color:#666;}
+@media(min-width:600px){main{padding:0 2rem;}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Mood Palette Generator</h1>
+  <button id="help-btn" aria-label="Help">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm1-13h-2v2h2V7zm0 4h-2v6h2v-6z"/></svg>
+  </button>
+</header>
+<main id="app">
+  <div id="mood-select">
+    <select id="mood-dropdown">
+      <option value="Joy">Joy</option>
+      <option value="Calm">Calm</option>
+      <option value="Urgent">Urgent</option>
+      <option value="Nostalgic">Nostalgic</option>
+      <option value="Mystery">Mystery</option>
+      <option value="Energetic">Energetic</option>
+    </select>
+    <input type="text" id="custom-mood" placeholder="Or type your mood…">
+    <button id="generate-btn">Generate</button>
+  </div>
+  <div id="palette"></div>
+</main>
+<footer>© 2026 • MIT License</footer>
+<div id="tooltip" role="status" aria-live="polite"></div>
+<script>
+(() => {
+  const state = { mood: 'Joy', customMood: '', palette: [], generating: false };
+  const moodHue = { Joy:60, Calm:210, Urgent:0, Nostalgic:300, Mystery:270, Energetic:30 };
+  const elements = {
+    dropdown: document.getElementById('mood-dropdown'),
+    custom: document.getElementById('custom-mood'),
+    generate: document.getElementById('generate-btn'),
+    palette: document.getElementById('palette'),
+    tooltip: document.getElementById('tooltip')
+  };
+
+  function init() {
+    const savedMood = localStorage.getItem('mood');
+    const savedCustom = localStorage.getItem('customMood');
+    if (savedMood) { state.mood = savedMood; elements.dropdown.value = savedMood; }
+    if (savedCustom) { state.customMood = savedCustom; elements.custom.value = savedCustom; }
+    elements.dropdown.addEventListener('change', onMoodChange);
+    elements.custom.addEventListener('input', onCustomMoodInput);
+    elements.generate.addEventListener('click', generatePalette);
+    renderPalette();
+  }
+
+  function onMoodChange(e) {
+    state.mood = e.target.value;
+    state.customMood = '';
+    elements.custom.value = '';
+    localStorage.setItem('mood', state.mood);
+    localStorage.removeItem('customMood');
+  }
+
+  function onCustomMoodInput(e) {
+    state.customMood = e.target.value.trim();
+    if (state.customMood) {
+      state.mood = '';
+      elements.dropdown.value = '';
+      localStorage.setItem('customMood', state.customMood);
+      localStorage.removeItem('mood');
+    }
+  }
+
+  function hashString(str) {
+    let hash = 0;
+    for (let i=0;i<str.length;i++) hash = ((hash<<5)-hash)+str.charCodeAt(i);
+    return hash >>> 0;
+  }
+
+  function generateColors(baseHue, count=5) {
+    const colors=[];
+    for(let i=0;i<count;i++){
+      let h = (baseHue + (Math.random()*40-20)+360)%360;
+      let s = 60 + Math.random()*20;
+      let l = 50 + Math.random()*20;
+      let hex = hslToHex(h,s,l);
+      colors.push({h,s,l,hex});
+    }
+    return colors;
+  }
+
+  function hslToHex(h,s,l){
+    s/=100; l/=100;
+    const c = (1-Math.abs(2*l-1))*s;
+    const x = c*(1-Math.abs((h/60)%2-1));
+    const m = l-c/2;
+    let r=0,g=0,b=0;
+    if(h<60){r=c;g=x;b=0;}
+    else if(h<120){r=x;g=c;b=0;}
+    else if(h<180){r=0;g=c;b=x;}
+    else if(h<240){r=0;g=x;b=c;}
+    else if(h<300){r=x;g=0;b=c;}
+    else{r=c;g=0;b=x;}
+    r=Math.round((r+m)*255);g=Math.round((g+m)*255);b=Math.round((b+m)*255);
+    return "#" + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+  }
+
+  function generatePalette() {
+    if(state.generating) return;
+    state.generating=true;
+    elements.generate.disabled=true;
+    const baseHue = state.customMood
+      ? (hashString(state.customMood)%360)
+      : (moodHue[state.mood] || 180);
+    state.palette = generateColors(baseHue);
+    renderPalette();
+    elements.generate.disabled=false;
+    state.generating=false;
+  }
+
+  function renderPalette() {
+    elements.palette.innerHTML='';
+    state.palette.forEach((c,i)=>{
+      const swatch=document.createElement('div');
+      swatch.className='swatch';
+      swatch.style.background=c.hex;
+      const hexEl=document.createElement('span');
+      hexEl.textContent=c.hex;
+      const copyBtn=document.createElement('button');
+      copyBtn.className='copy-btn';
+      copyBtn.setAttribute('aria-label',`Copy ${c.hex}`);
+      copyBtn.innerHTML='&#128203;';
+      copyBtn.onclick=()=>copyHex(i,swatch);
+      swatch.appendChild(copyBtn);
+      swatch.appendChild(hexEl);
+      elements.palette.appendChild(swatch);
+    });
+  }
+
+  async function copyHex(index, swatch) {
+    const hex=state.palette[index].hex;
+    try{await navigator.clipboard.writeText(hex);}
+    catch(e){alert('Clipboard not available');}
+    showTooltip(`Copied ${hex}`, swatch);
+  }
+
+  function showTooltip(msg, swatch) {
+    const rect=swatch.getBoundingClientRect();
+    elements.tooltip.textContent=msg;
+    elements.tooltip.style.top=(rect.top-30)+'px';
+    elements.tooltip.style.left=(rect.left+rect.width/2-50)+'px';
+    elements.tooltip.classList.add('show');
+    setTimeout(()=>elements.tooltip.classList.remove('show'),1500);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

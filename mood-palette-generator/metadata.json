@@ -1,0 +1,23 @@
+{
+  "title": "Mood Palette Generator",
+  "description": "Generate a mood-based color palette and preview for UI design, all offline.",
+  "category": "tool",
+  "slug": "mood-palette-generator",
+  "date": "2026-03-08",
+  "benchmark": {
+    "phase1_seconds": 22.3,
+    "phase2_seconds": 18.9,
+    "total_seconds": 41.2,
+    "output_bytes": 7462,
+    "temperature": 0.7999999999999999,
+    "attempt": 2,
+    "model": "gpt-oss:20b",
+    "parameter_size": "20.9B",
+    "quantization": "MXFP4",
+    "family": "gptoss",
+    "os": "Linux",
+    "arch": "x86_64",
+    "vram_gb": 13.9,
+    "compute": "NVIDIA GeForce RTX 3090 / 24576 MiB / AMD Ryzen 5 3600 6-Core Processor / 15GB RAM"
+  }
+}
